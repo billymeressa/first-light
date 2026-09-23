@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Entry } from './content/types';
 import { THEMES } from './content/types';
-import { recordCompletion, useStore } from './state/store';
-import { entryForDay } from './state/daily';
+import { recordCompletion, useStore, type PracticeSet } from './state/store';
+import { entryForDay, resolveEntries } from './state/daily';
 import { computeStreak } from './state/streak';
 import { binaural } from './audio/binaural';
 import { loadVoices } from './audio/speech';
@@ -14,6 +15,11 @@ import { Settings } from './components/Settings';
 import { Library } from './components/Library';
 
 type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library';
+
+interface Session {
+  entries: Entry[];
+  setName?: string;
+}
 
 /** Re-renders when the local calendar day rolls over, for apps left open overnight. */
 function useToday(): string {
@@ -32,6 +38,7 @@ export default function App() {
   const state = useStore();
   const today = useToday();
   const [view, setView] = useState<View>('home');
+  const [session, setSession] = useState<Session | null>(null);
   const [waking, setWaking] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const stopAlarm = useRef<(() => void) | null>(null);
@@ -84,11 +91,20 @@ export default function App() {
   }, []);
 
   // ── Navigation ────────────────────────────────────────────────────────
-  const beginRitual = () => {
+  const startSession = (next: Session) => {
     // Started inside the click handler: browsers only allow an AudioContext to
     // start from a user gesture, and an effect after render is too late in Safari.
     if (state.settings.binauralEnabled) void binaural.start(state.settings.binaural);
+    setSession(next);
     setView('ritual');
+  };
+
+  const beginRitual = () => startSession({ entries: [entry] });
+
+  const beginSet = (set: PracticeSet) => {
+    const resolved = resolveEntries(state, set.entryIds);
+    if (!resolved.length) return; // Nothing left to practice — button is disabled for this case.
+    startSession({ entries: resolved, setName: set.name });
   };
 
   const beginFromAlarm = () => {
@@ -155,18 +171,24 @@ export default function App() {
             entry={entry}
             stats={stats}
             alarmTime={alarmEnabled ? alarmTime : null}
+            sets={state.sets}
             onBegin={beginRitual}
+            onBeginSet={beginSet}
             onViewStreak={() => setView('streak')}
           />
         )}
 
-        {view === 'ritual' && (
+        {view === 'ritual' && session && (
           <Ritual
-            entry={entry}
+            entries={session.entries}
+            setName={session.setName}
             settings={state.settings}
             streakAfter={projectedStreak}
-            onFinish={() => recordCompletion(entry.id, today)}
-            onExit={() => setView('home')}
+            onFinish={(entryIds) => recordCompletion(entryIds, today, session.setName)}
+            onExit={() => {
+              setSession(null);
+              setView('home');
+            }}
           />
         )}
 

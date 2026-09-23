@@ -24,7 +24,17 @@ export interface Settings {
 
 export interface HistoryItem {
   date: string;
-  entryId: string;
+  /** The affirmations practiced that day, in practice order. */
+  entryIds: string[];
+  /** Present when the practice was a saved set rather than the daily pick. */
+  setName?: string;
+}
+
+export interface PracticeSet {
+  id: string;
+  name: string;
+  /** Entry ids in practice order. */
+  entryIds: string[];
 }
 
 export interface AppState {
@@ -34,6 +44,7 @@ export interface AppState {
   /** Library entry ids the user has retired from the rotation. */
   hidden: string[];
   history: HistoryItem[];
+  sets: PracticeSet[];
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -58,8 +69,26 @@ function initialState(): AppState {
     customEntries: [],
     hidden: [],
     history: [],
+    sets: [],
     seed: Math.floor(Math.random() * 2 ** 31),
   };
+}
+
+/** A history item from before sets existed, when each day held one entry. */
+interface LegacyHistoryItem {
+  date: string;
+  entryId?: string;
+  entryIds?: string[];
+  setName?: string;
+}
+
+function migrateHistory(raw: unknown): HistoryItem[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as LegacyHistoryItem[]).map((h) => ({
+    date: h.date,
+    entryIds: h.entryIds ?? (h.entryId ? [h.entryId] : []),
+    ...(h.setName ? { setName: h.setName } : {}),
+  }));
 }
 
 function load(): AppState {
@@ -80,7 +109,8 @@ function load(): AppState {
       },
       customEntries: parsed.customEntries ?? [],
       hidden: parsed.hidden ?? [],
-      history: parsed.history ?? [],
+      history: migrateHistory(parsed.history),
+      sets: parsed.sets ?? [],
       seed: parsed.seed ?? base.seed,
     };
   } catch {
@@ -124,11 +154,11 @@ export function patchSettings(patch: Partial<Settings>) {
   setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
 }
 
-export function recordCompletion(entryId: string, date: string) {
+export function recordCompletion(entryIds: string[], date: string, setName?: string) {
   setState((s) =>
     s.history.some((h) => h.date === date)
       ? s
-      : { ...s, history: [...s.history, { date, entryId }] },
+      : { ...s, history: [...s.history, { date, entryIds, ...(setName ? { setName } : {}) }] },
   );
 }
 
@@ -152,6 +182,29 @@ export function toggleHidden(id: string) {
     ...s,
     hidden: s.hidden.includes(id) ? s.hidden.filter((h) => h !== id) : [...s.hidden, id],
   }));
+}
+
+/** A set is a handful of affirmations the user wants to move through in one
+ * sitting — curated independently of the daily draw and its theme focus. */
+export function createSet(name: string): string {
+  const id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  setState((s) => ({ ...s, sets: [...s.sets, { id, name, entryIds: [] }] }));
+  return id;
+}
+
+export function renameSet(id: string, name: string) {
+  setState((s) => ({ ...s, sets: s.sets.map((set) => (set.id === id ? { ...set, name } : set)) }));
+}
+
+export function setSetEntries(id: string, entryIds: string[]) {
+  setState((s) => ({
+    ...s,
+    sets: s.sets.map((set) => (set.id === id ? { ...set, entryIds } : set)),
+  }));
+}
+
+export function deleteSet(id: string) {
+  setState((s) => ({ ...s, sets: s.sets.filter((set) => set.id !== id) }));
 }
 
 export function resetAll() {

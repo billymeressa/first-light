@@ -1,5 +1,6 @@
 import type { Entry } from '../content/types';
 import { THEMES } from '../content/types';
+import type { PracticeSet } from '../state/store';
 import type { StreakStats } from '../state/streak';
 import { greeting } from '../lib/date';
 
@@ -7,11 +8,13 @@ interface Props {
   entry: Entry;
   stats: StreakStats;
   alarmTime: string | null;
+  sets: PracticeSet[];
   onBegin: () => void;
+  onBeginSet: (set: PracticeSet) => void;
   onViewStreak: () => void;
 }
 
-export function Home({ entry, stats, alarmTime, onBegin, onViewStreak }: Props) {
+export function Home({ entry, stats, alarmTime, sets, onBegin, onBeginSet, onViewStreak }: Props) {
   const themeLabel = THEMES.find((t) => t.id === entry.theme)?.label ?? entry.theme;
 
   return (
@@ -64,6 +67,29 @@ export function Home({ entry, stats, alarmTime, onBegin, onViewStreak }: Props) 
           </span>
         </button>
       </div>
+
+      {sets.length > 0 && (
+        <div className="stack gap-sm soften" style={{ marginTop: '0.5rem' }}>
+          <span className="eyebrow">Your sets</span>
+          <div className="chips">
+            {sets.map((set) => (
+              <button
+                key={set.id}
+                className="chip"
+                disabled={set.entryIds.length === 0}
+                title={
+                  set.entryIds.length === 0
+                    ? 'Add affirmations to this set in the Library first.'
+                    : undefined
+                }
+                onClick={() => onBeginSet(set)}
+              >
+                {set.name} · {set.entryIds.length}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {alarmTime && (
         <p className="faint soften" style={{ fontSize: '0.78rem' }}>

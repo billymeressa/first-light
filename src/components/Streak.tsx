@@ -56,7 +56,9 @@ export function Streak() {
             Recent
           </h2>
           {recent.map((h) => {
-            const entry = entryById(state, h.entryId);
+            const label = h.setName
+              ? `${h.setName} (${h.entryIds.length} affirmation${h.entryIds.length === 1 ? '' : 's'})`
+              : (entryById(state, h.entryIds[0])?.affirmation ?? 'A practice');
             return (
               <div className="history-item" key={h.date}>
                 <time dateTime={h.date}>
@@ -65,7 +67,7 @@ export function Streak() {
                     day: 'numeric',
                   })}
                 </time>
-                <span className="muted">{entry?.affirmation ?? 'A practice'}</span>
+                <span className="muted">{label}</span>
               </div>
             );
           })}

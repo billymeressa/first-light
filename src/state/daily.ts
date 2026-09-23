@@ -47,7 +47,7 @@ export function entryForDay(state: AppState, date: string): Entry {
     state.history
       .filter((h) => h.date < date)
       .slice(-lookback)
-      .map((h) => h.entryId),
+      .flatMap((h) => h.entryIds),
   );
 
   const fresh = pool.filter((e) => !recent.has(e.id));
@@ -62,4 +62,11 @@ export function entryForDay(state: AppState, date: string): Entry {
 /** The entry actually shown for a past day, falling back to a fresh draw. */
 export function entryById(state: AppState, id: string): Entry | undefined {
   return allEntries(state).find((e) => e.id === id);
+}
+
+/** Resolve a list of ids (e.g. a set's entryIds) to entries, in order,
+ * silently dropping any that reference a since-deleted custom entry. */
+export function resolveEntries(state: AppState, ids: string[]): Entry[] {
+  const byId = new Map(allEntries(state).map((e) => [e.id, e]));
+  return ids.map((id) => byId.get(id)).filter((e): e is Entry => e !== undefined);
 }

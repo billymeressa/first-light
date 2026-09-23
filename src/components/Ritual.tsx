@@ -10,22 +10,28 @@ import { BreathCircle } from './BreathCircle';
 type Phase = 'settle' | 'affirmation' | 'scene' | 'done';
 
 interface Props {
-  entry: Entry;
+  /** One or more affirmations to move through in this sitting. */
+  entries: Entry[];
+  /** The saved set's name, when practicing one. Undefined for the daily pick. */
+  setName?: string;
   settings: Settings;
   streakAfter: number;
-  onFinish: () => void;
+  onFinish: (entryIds: string[]) => void;
   onExit: () => void;
 }
 
 /** Minimum beat a line is held for, even if speech ran long. */
 const MIN_HOLD = 2200;
 
-export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props) {
+export function Ritual({ entries, setName, settings, streakAfter, onFinish, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>(settings.settleBreaths > 0 ? 'settle' : 'affirmation');
   const [soundOn, setSoundOn] = useState(settings.binauralEnabled);
+  const [entryIndex, setEntryIndex] = useState(0);
   const [repeatIndex, setRepeatIndex] = useState(0);
   const recorded = useRef(false);
 
+  const entry = entries[entryIndex];
+  const isLastEntry = entryIndex + 1 >= entries.length;
   const repeatTotal = Math.max(1, Math.round(settings.affirmationRepeats));
 
   // The scene is authored one moment per line but read as a single paragraph.
@@ -63,6 +69,17 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
     [settings.speech],
   );
 
+  /** Move past the current entry's scene: into the next entry, or done. */
+  const advancePastScene = useCallback(() => {
+    if (isLastEntry) {
+      setPhase('done');
+    } else {
+      setEntryIndex((i) => i + 1);
+      setRepeatIndex(0);
+      setPhase('affirmation');
+    }
+  }, [isLastEntry]);
+
   // Keep the running tone in sync with live settings changes.
   useEffect(() => {
     if (soundOn) binaural.update(settings.binaural);
@@ -90,22 +107,22 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
     // Paced per line plus one beat for the seal, so a longer scene — and its
     // closing feeling — both get proportionally more room to land.
     const hold = settings.scenePace * (entry.scene.length + 1) * 1000;
-    return speakAndHold(fullSceneText, hold, () => setPhase('done'));
-  }, [phase, fullSceneText, entry.scene.length, settings.scenePace, speakAndHold]);
+    return speakAndHold(fullSceneText, hold, advancePastScene);
+  }, [phase, fullSceneText, entry.scene.length, settings.scenePace, speakAndHold, advancePastScene]);
 
   useEffect(() => {
     if (phase !== 'done' || recorded.current) return;
     recorded.current = true;
     binaural.stop();
     void chime({ freq: 528, gain: 0.14, decay: 4.5 });
-    onFinish();
-  }, [phase, onFinish]);
+    onFinish(entries.map((e) => e.id));
+  }, [phase, onFinish, entries]);
 
   const advance = () => {
     cancelSpeech();
     if (phase === 'settle') setPhase('affirmation');
     else if (phase === 'affirmation') setPhase('scene');
-    else if (phase === 'scene') setPhase('done');
+    else if (phase === 'scene') advancePastScene();
   };
 
   const toggleSound = () => {
@@ -119,10 +136,17 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
   };
 
   const themeLabel = THEMES.find((t) => t.id === entry.theme)?.label ?? entry.theme;
+  const isSession = entries.length > 1;
 
   return (
     <div className="ritual">
       <div className="ritual-body">
+        {isSession && (phase === 'affirmation' || phase === 'scene') && (
+          <p className="faint session-tag">
+            {setName ?? 'Practice'} · {entryIndex + 1} of {entries.length}
+          </p>
+        )}
+
         {phase === 'settle' && (
           <div className="soften">
             <BreathCircle
@@ -157,7 +181,16 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
           <div className="center-col gap-lg soften">
             <div className="stack gap-sm center-col">
               <span className="eyebrow">Complete</span>
-              <p className="affirmation">{entry.affirmation}</p>
+              {isSession ? (
+                <>
+                  <p className="affirmation">{setName ?? 'Practice complete.'}</p>
+                  <p className="muted">
+                    {entries.length} affirmations, one sitting.
+                  </p>
+                </>
+              ) : (
+                <p className="affirmation">{entry.affirmation}</p>
+              )}
             </div>
             <p className="muted">
               {streakAfter === 1

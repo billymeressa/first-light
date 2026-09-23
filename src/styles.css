@@ -159,6 +159,15 @@ select {
   color: var(--ink-faint);
 }
 
+/* Set-practice progress marker, shown above the affirmation/scene while
+   working through more than one entry in a sitting. */
+.session-tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+
 /* ── Motion ──────────────────────────────────────────────────────────── */
 
 @keyframes rise {
@@ -698,6 +707,11 @@ button:focus-visible {
   color: var(--ink);
   border-color: hsl(var(--hue) 50% 60% / 0.55);
   background: hsl(var(--hue) 55% 60% / 0.14);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .note {

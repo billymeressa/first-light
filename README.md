@@ -12,7 +12,9 @@ npm run build
 ## What it does
 
 Each day it draws one paired **affirmation + visualization** from a library of 60,
-across five themes (confidence, calm, health, relationships, growth). The practice
+across five themes (confidence, calm, health, relationships, growth). Or, practice
+a **set** — a handful of affirmations you curate yourself, in whatever order you
+like, walked through in one sitting instead of just the daily pick. The practice
 runs as a guided sequence rather than a screen of controls:
 
 1. **Settle** — a 4–2–6 breath, paced by an expanding orb (configurable, or off)
@@ -34,7 +36,8 @@ settings, and anything you write live in this browser's `localStorage`.
 | `src/audio/chime.ts` | Additive bell for transitions and the wake alarm. |
 | `src/state/daily.ts` | Deterministic per-date draw that avoids the last 25 entries. |
 | `src/state/streak.ts` | Forgiving streak math (a streak survives until midnight). |
-| `src/components/Ritual.tsx` | The guided sequence. |
+| `src/components/Ritual.tsx` | The guided sequence — walks one entry, or a whole set in order. |
+| `src/components/Library.tsx` | Entries tab (write/retire) and Sets tab (build/reorder/edit). |
 
 ## Notes on the design
 
@@ -63,4 +66,8 @@ this app has to get right — impossible to judge while building. See
 
 - **Library → Write one** adds your own affirmation and scene.
 - **Library → Retire** removes any built-in line from the daily draw.
-- **Settings → Practice** locks the draw to a single theme, or sets the pace.
+- **Library → Sets → New set** builds a named, ordered group of affirmations —
+  mix themes, mix your own lines with the library, reorder with ↑/↓.
+- **Home → Your sets** starts a saved set as one sitting; the streak counts it
+  the same as the daily pick, and "Recent" shows the set's name and length.
+- **Settings → Practice** locks the daily draw to a single theme, or sets the pace.
