@@ -9,6 +9,7 @@ import {
   useStore,
 } from '../state/store';
 import { describeGenerationError, generateFromJournal, type GeneratedEntry } from '../ai/anthropic';
+import { generateFromJournalLocal } from '../ai/local';
 
 type Tab = 'entries' | 'portrait';
 
@@ -42,23 +43,28 @@ export function Journal() {
   };
 
   const reflect = async (journalId: string, text: string) => {
-    if (!state.apiKey) {
+    if (state.generationMode === 'api' && !state.apiKey) {
       setReflectError('Add an API key in Settings → AI generation before reflecting.');
       return;
     }
     setReflectError(null);
     setReflectingId(journalId);
     try {
-      const result = await generateFromJournal({
-        journalText: text,
-        currentPortrait,
-        apiKey: state.apiKey,
-      });
+      const result =
+        state.generationMode === 'local'
+          ? await generateFromJournalLocal(text, currentPortrait)
+          : await generateFromJournal({ journalText: text, currentPortrait, apiKey: state.apiKey! });
       setSuggestions(result.entries.map(toSuggestion));
       setPortraitDraft(result.portrait);
       setReviewJournalId(journalId);
     } catch (err) {
-      setReflectError(describeGenerationError(err));
+      setReflectError(
+        state.generationMode === 'local'
+          ? err instanceof Error
+            ? err.message
+            : 'Local generation failed.'
+          : describeGenerationError(err),
+      );
     } finally {
       setReflectingId(null);
     }

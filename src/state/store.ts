@@ -67,6 +67,9 @@ export interface AppState {
   portraitHistory: PortraitVersion[];
   /** The user's own Anthropic API key, used only for journal reflection. */
   apiKey: string | null;
+  /** 'local' shells out to the claude CLI on this machine (no key, laptop
+   * only); 'api' calls the Anthropic API from the browser with apiKey. */
+  generationMode: 'local' | 'api';
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -95,6 +98,7 @@ function initialState(): AppState {
     journal: [],
     portraitHistory: [],
     apiKey: null,
+    generationMode: 'local',
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
@@ -139,6 +143,7 @@ function load(): AppState {
       journal: parsed.journal ?? [],
       portraitHistory: parsed.portraitHistory ?? [],
       apiKey: parsed.apiKey ?? null,
+      generationMode: parsed.generationMode ?? base.generationMode,
       seed: parsed.seed ?? base.seed,
     };
   } catch {
@@ -275,6 +280,10 @@ export function addPortraitVersion(text: string) {
 
 export function setApiKey(apiKey: string | null) {
   setState((s) => ({ ...s, apiKey }));
+}
+
+export function setGenerationMode(generationMode: 'local' | 'api') {
+  setState((s) => ({ ...s, generationMode }));
 }
 
 export function resetAll() {

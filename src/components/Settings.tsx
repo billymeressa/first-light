@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
-import { patchSettings, resetAll, setApiKey, useStore } from '../state/store';
+import { patchSettings, resetAll, setApiKey, setGenerationMode, useStore } from '../state/store';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
   loadVoices,
@@ -380,26 +380,60 @@ export function Settings() {
 
       <section className="section">
         <h2>AI generation</h2>
-        <p className="note" style={{ marginBottom: '1.25rem' }}>
-          Journal → Reflect calls the Claude API directly from this browser, using your own
-          API key — there's no server in between. The journal entry you're reflecting on is
-          sent to Anthropic each time you do this; nothing else in the app is. The key itself
-          is stored in this browser's local storage, unencrypted, the same as everything else
-          the app remembers. Treat it like a password: anyone with access to this browser could
-          read it from developer tools.
+        <p className="faint" style={{ fontSize: '0.8rem', marginBottom: '0.7rem' }}>
+          How Journal → Reflect should generate new affirmations.
         </p>
-        <Row label="Anthropic API key">
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            aria-label="Anthropic API key"
-            placeholder="sk-ant-…"
-            value={state.apiKey ?? ''}
-            onChange={(e) => setApiKey(e.target.value.trim() || null)}
-            style={{ width: '14rem' }}
-          />
-        </Row>
+        <div className="chips" style={{ marginBottom: '1.25rem' }}>
+          <button
+            className="chip"
+            aria-pressed={state.generationMode === 'local'}
+            onClick={() => setGenerationMode('local')}
+          >
+            This machine
+          </button>
+          <button
+            className="chip"
+            aria-pressed={state.generationMode === 'api'}
+            onClick={() => setGenerationMode('api')}
+          >
+            API key
+          </button>
+        </div>
+
+        {state.generationMode === 'local' ? (
+          <p className="note">
+            Uses the <code>claude</code> CLI already logged in on this computer — no key,
+            no separate billing, rides on whatever Claude plan is signed in here. This only
+            works while you're running the app locally with <code>npm run dev</code> on this
+            machine. It will not work on the deployed site or from your phone — there's no
+            server there to shell out to anything. Reflecting can take a minute or two; if it
+            times out, switch to API key mode above.
+          </p>
+        ) : (
+          <>
+            <p className="note" style={{ marginBottom: '1.25rem' }}>
+              Journal → Reflect calls the Claude API directly from this browser, using your own
+              API key — there's no server in between. The journal entry you're reflecting on is
+              sent to Anthropic each time you do this; nothing else in the app is. The key itself
+              is stored in this browser's local storage, unencrypted, the same as everything else
+              the app remembers. Treat it like a password: anyone with access to this browser could
+              read it from developer tools. This is the option that works from your phone and on
+              the deployed site.
+            </p>
+            <Row label="Anthropic API key">
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Anthropic API key"
+                placeholder="sk-ant-…"
+                value={state.apiKey ?? ''}
+                onChange={(e) => setApiKey(e.target.value.trim() || null)}
+                style={{ width: '14rem' }}
+              />
+            </Row>
+          </>
+        )}
       </section>
 
       <section className="section">
