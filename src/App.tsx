@@ -1,0 +1,171 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { THEMES } from './content/types';
+import { recordCompletion, useStore } from './state/store';
+import { entryForDay } from './state/daily';
+import { computeStreak } from './state/streak';
+import { binaural } from './audio/binaural';
+import { gentleAlarm } from './audio/chime';
+import { dayKey, msUntilNext } from './lib/date';
+import { Home } from './components/Home';
+import { Ritual } from './components/Ritual';
+import { Streak } from './components/Streak';
+import { Settings } from './components/Settings';
+import { Library } from './components/Library';
+
+type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library';
+
+/** Re-renders when the local calendar day rolls over, for apps left open overnight. */
+function useToday(): string {
+  const [today, setToday] = useState(dayKey);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = dayKey();
+      setToday((prev) => (prev === now ? prev : now));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return today;
+}
+
+export default function App() {
+  const state = useStore();
+  const today = useToday();
+  const [view, setView] = useState<View>('home');
+  const [waking, setWaking] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
+  const stopAlarm = useRef<(() => void) | null>(null);
+
+  const entry = useMemo(() => entryForDay(state, today), [state, today]);
+  const dates = useMemo(() => state.history.map((h) => h.date), [state.history]);
+  const stats = useMemo(() => computeStreak(dates), [dates]);
+  const projectedStreak = stats.doneToday
+    ? stats.current
+    : computeStreak([...dates, today]).current;
+
+  const hue = THEMES.find((t) => t.id === entry.theme)?.hue ?? 28;
+
+  // ── Wake alarm ────────────────────────────────────────────────────────
+  const { alarmEnabled, alarmTime } = state.settings;
+  useEffect(() => {
+    if (!alarmEnabled) return;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const arm = () => {
+      timer = setTimeout(() => {
+        setWaking(true);
+        stopAlarm.current = gentleAlarm();
+        arm(); // Re-arm for tomorrow.
+      }, msUntilNext(alarmTime));
+    };
+    arm();
+
+    return () => clearTimeout(timer);
+  }, [alarmEnabled, alarmTime]);
+
+  useEffect(() => {
+    if (!waking) return;
+    const id = setInterval(() => setClock(new Date()), 10_000);
+    setClock(new Date());
+    return () => clearInterval(id);
+  }, [waking]);
+
+  const silenceAlarm = () => {
+    stopAlarm.current?.();
+    stopAlarm.current = null;
+    setWaking(false);
+  };
+
+  // ── Navigation ────────────────────────────────────────────────────────
+  const beginRitual = () => {
+    // Started inside the click handler: browsers only allow an AudioContext to
+    // start from a user gesture, and an effect after render is too late in Safari.
+    if (state.settings.binauralEnabled) void binaural.start(state.settings.binaural);
+    setView('ritual');
+  };
+
+  const beginFromAlarm = () => {
+    silenceAlarm();
+    beginRitual();
+  };
+
+  const nav: { id: View; label: string }[] = [
+    { id: 'home', label: 'Today' },
+    { id: 'streak', label: 'Practice' },
+    { id: 'library', label: 'Library' },
+    { id: 'settings', label: 'Settings' },
+  ];
+
+  return (
+    <div
+      className={`app${state.settings.reduceMotion ? ' reduce-motion' : ''}`}
+      style={{ ['--hue' as string]: hue }}
+    >
+      <div className="aurora" />
+
+      {waking && (
+        <div className="wake">
+          <div className="stack gap-sm center-col">
+            <span className="eyebrow">Good morning</span>
+            <p className="wake-time">
+              {clock.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+          <p className="muted" style={{ maxWidth: '20rem', lineHeight: 1.6 }}>
+            Take your time. When you're ready, the practice is here.
+          </p>
+          <div className="stack gap-sm center-col">
+            <button className="btn btn-primary" onClick={beginFromAlarm}>
+              Begin
+            </button>
+            <button className="btn-quiet" onClick={silenceAlarm}>
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="screen">
+        {view !== 'ritual' && (
+          <header className="topbar">
+            <span className="eyebrow wordmark">First Light</span>
+            <nav className="nav">
+              {nav.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => setView(n.id)}
+                  aria-current={view === n.id ? 'page' : undefined}
+                >
+                  {n.label}
+                </button>
+              ))}
+            </nav>
+          </header>
+        )}
+
+        {view === 'home' && (
+          <Home
+            entry={entry}
+            stats={stats}
+            alarmTime={alarmEnabled ? alarmTime : null}
+            onBegin={beginRitual}
+            onViewStreak={() => setView('streak')}
+          />
+        )}
+
+        {view === 'ritual' && (
+          <Ritual
+            entry={entry}
+            settings={state.settings}
+            streakAfter={projectedStreak}
+            onFinish={() => recordCompletion(entry.id, today)}
+            onExit={() => setView('home')}
+          />
+        )}
+
+        {view === 'streak' && <Streak />}
+        {view === 'library' && <Library />}
+        {view === 'settings' && <Settings />}
+      </div>
+    </div>
+  );
+}
