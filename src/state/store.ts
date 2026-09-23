@@ -14,6 +14,8 @@ export interface Settings {
   /** Seconds each line of the scene is held before the next appears. */
   scenePace: number;
   settleBreaths: number;
+  /** How many times the affirmation is said before moving to the scene. */
+  affirmationRepeats: number;
   alarmEnabled: boolean;
   /** Local "HH:MM". */
   alarmTime: string;
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   themeFocus: 'all',
   scenePace: 11,
   settleBreaths: 4,
+  affirmationRepeats: 2,
   alarmEnabled: false,
   alarmTime: '06:30',
   reduceMotion: false,

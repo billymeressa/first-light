@@ -23,7 +23,10 @@ const MIN_HOLD = 2200;
 export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>(settings.settleBreaths > 0 ? 'settle' : 'affirmation');
   const [soundOn, setSoundOn] = useState(settings.binauralEnabled);
+  const [repeatIndex, setRepeatIndex] = useState(0);
   const recorded = useRef(false);
+
+  const repeatTotal = Math.max(1, Math.round(settings.affirmationRepeats));
 
   // The scene is authored one moment per line but read as a single paragraph.
   const sceneText = entry.scene.join(' ');
@@ -72,8 +75,11 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
   useEffect(() => {
     if (phase !== 'affirmation') return;
     const hold = settings.speech.enabled ? 4200 : 7500;
-    return speakAndHold(entry.affirmation, hold, () => setPhase('scene'));
-  }, [phase, entry.affirmation, settings.speech.enabled, speakAndHold]);
+    return speakAndHold(entry.affirmation, hold, () => {
+      if (repeatIndex + 1 < repeatTotal) setRepeatIndex((i) => i + 1);
+      else setPhase('scene');
+    });
+  }, [phase, repeatIndex, repeatTotal, entry.affirmation, settings.speech.enabled, speakAndHold]);
 
   useEffect(() => {
     if (phase !== 'scene') return;
@@ -128,9 +134,14 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
         )}
 
         {phase === 'affirmation' && (
-          <div className="stack gap-md rise" key={entry.id}>
+          <div className="stack gap-md rise" key={`${entry.id}-${repeatIndex}`}>
             <span className="theme-tag">{themeLabel}</span>
             <p className="affirmation">{entry.affirmation}</p>
+            {repeatTotal > 1 && (
+              <span className="faint" style={{ fontSize: '0.78rem', letterSpacing: '0.06em' }}>
+                {repeatIndex + 1} of {repeatTotal}
+              </span>
+            )}
           </div>
         )}
 

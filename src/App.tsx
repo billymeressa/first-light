@@ -4,6 +4,7 @@ import { recordCompletion, useStore } from './state/store';
 import { entryForDay } from './state/daily';
 import { computeStreak } from './state/streak';
 import { binaural } from './audio/binaural';
+import { loadVoices } from './audio/speech';
 import { gentleAlarm } from './audio/chime';
 import { dayKey, msUntilNext } from './lib/date';
 import { Home } from './components/Home';
@@ -74,6 +75,13 @@ export default function App() {
     stopAlarm.current = null;
     setWaking(false);
   };
+
+  // Voice lists load asynchronously in Chrome. Kick that off as soon as the
+  // app opens rather than waiting for the first affirmation to need one, so
+  // the opening line of the ritual doesn't sit through the load delay.
+  useEffect(() => {
+    void loadVoices();
+  }, []);
 
   // ── Navigation ────────────────────────────────────────────────────────
   const beginRitual = () => {

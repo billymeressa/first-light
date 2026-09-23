@@ -79,13 +79,20 @@ function resolveVoice(uri: string | null): SpeechSynthesisVoice | null {
  * Speak a line. Resolves when the utterance finishes, is cancelled, or errors —
  * never rejects, because a failed read-aloud should not break the ritual flow.
  */
-export function speak(text: string, settings: SpeechSettings): Promise<void> {
-  if (!speechSupported || !settings.enabled || !text.trim()) return Promise.resolve();
+export async function speak(text: string, settings: SpeechSettings): Promise<void> {
+  if (!speechSupported || !settings.enabled || !text.trim()) return;
+
+  // Voices populate asynchronously in Chrome: `getVoices()` returns `[]` on a
+  // fresh page until `voiceschanged` fires. Wait for that at least once before
+  // concluding there are none — otherwise the very first affirmation (before
+  // anything else has triggered a voice load) silently never speaks.
+  const voices = cachedVoices.length ? cachedVoices : await loadVoices();
 
   // Some environments (headless Chrome, locked-down Linux builds) expose the
-  // API but ship no voices at all. `speak` there never fires `onend`, which
-  // would stall the ritual on every line, so treat it as read-aloud being off.
-  if (!resolveVoice(settings.voiceURI) && !cachedVoices.length) return Promise.resolve();
+  // API but ship no voices at all even after waiting. `speak` there never
+  // fires `onend`, which would stall the ritual on every line, so treat it as
+  // read-aloud being unavailable rather than hanging.
+  if (!voices.length) return;
 
   return new Promise((resolve) => {
     // Chrome keeps a queue; a stale utterance would otherwise play over this one.

@@ -165,6 +165,18 @@ export function Settings() {
           />
         </Row>
 
+        <Row label="Repeat the affirmation" hint="How many times the line is said before the scene.">
+          <Slider
+            label="Repeat the affirmation"
+            value={s.affirmationRepeats}
+            min={1}
+            max={5}
+            step={1}
+            onChange={(v) => patchSettings({ affirmationRepeats: v })}
+            format={(v) => (v === 1 ? 'once' : `${v}×`)}
+          />
+        </Row>
+
         <Row label="Scene pace" hint="Time per line of the scene. A longer scene dwells longer.">
           <Slider
             label="Scene pace"
