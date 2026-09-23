@@ -16,10 +16,10 @@ across five themes (confidence, calm, health, relationships, growth). The practi
 runs as a guided sequence rather than a screen of controls:
 
 1. **Settle** — a 4–2–6 breath, paced by an expanding orb (configurable, or off)
-2. **Affirmation** — the line, optionally read aloud
-3. **Scene** — the visualization as one compact paragraph, read aloud as a whole
-4. **Seal** — the feeling to close on
-5. **Complete** — the day is marked
+2. **Affirmation** — the line, said once or repeated (configurable), optionally read aloud
+3. **Picture it** — the visualization as one compact paragraph, its closing feeling folded
+   in as the final, emphasized beat — read aloud as a whole
+4. **Complete** — the day is marked
 
 Everything is local. No account, no server, no network requests — your streak,
 settings, and anything you write live in this browser's `localStorage`.

@@ -7,7 +7,7 @@ import { speak, cancelSpeech } from '../audio/speech';
 import { chime } from '../audio/chime';
 import { BreathCircle } from './BreathCircle';
 
-type Phase = 'settle' | 'affirmation' | 'scene' | 'seal' | 'done';
+type Phase = 'settle' | 'affirmation' | 'scene' | 'done';
 
 interface Props {
   entry: Entry;
@@ -29,7 +29,11 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
   const repeatTotal = Math.max(1, Math.round(settings.affirmationRepeats));
 
   // The scene is authored one moment per line but read as a single paragraph.
+  // The seal — the feeling the entry closes on — is folded in as its final
+  // beat, rather than shown as its own screen, so "picture it" always carries
+  // the emotional payoff instead of stopping at the neutral imagery.
   const sceneText = entry.scene.join(' ');
+  const fullSceneText = `${sceneText} ${entry.seal}`;
 
   /**
    * Speak a line, then hold it on screen. The hold is measured from when the
@@ -83,15 +87,11 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
 
   useEffect(() => {
     if (phase !== 'scene') return;
-    // Still paced per line, so a longer scene dwells proportionally longer.
-    const hold = settings.scenePace * entry.scene.length * 1000;
-    return speakAndHold(sceneText, hold, () => setPhase('seal'));
-  }, [phase, sceneText, entry.scene.length, settings.scenePace, speakAndHold]);
-
-  useEffect(() => {
-    if (phase !== 'seal') return;
-    return speakAndHold(entry.seal, 9000, () => setPhase('done'));
-  }, [phase, entry.seal, speakAndHold]);
+    // Paced per line plus one beat for the seal, so a longer scene — and its
+    // closing feeling — both get proportionally more room to land.
+    const hold = settings.scenePace * (entry.scene.length + 1) * 1000;
+    return speakAndHold(fullSceneText, hold, () => setPhase('done'));
+  }, [phase, fullSceneText, entry.scene.length, settings.scenePace, speakAndHold]);
 
   useEffect(() => {
     if (phase !== 'done' || recorded.current) return;
@@ -105,8 +105,7 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
     cancelSpeech();
     if (phase === 'settle') setPhase('affirmation');
     else if (phase === 'affirmation') setPhase('scene');
-    else if (phase === 'scene') setPhase('seal');
-    else if (phase === 'seal') setPhase('done');
+    else if (phase === 'scene') setPhase('done');
   };
 
   const toggleSound = () => {
@@ -149,15 +148,8 @@ export function Ritual({ entry, settings, streakAfter, onFinish, onExit }: Props
           <div className="stack gap-md rise">
             <span className="eyebrow">Picture it</span>
             <p className="scene-line" aria-live="polite">
-              {sceneText}
+              {sceneText} <span className="scene-feeling">{entry.seal}</span>
             </p>
-          </div>
-        )}
-
-        {phase === 'seal' && (
-          <div className="stack gap-md rise">
-            <span className="eyebrow">Hold the feeling</span>
-            <p className="affirmation">{entry.seal}</p>
           </div>
         )}
 

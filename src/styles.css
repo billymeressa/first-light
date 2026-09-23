@@ -143,6 +143,14 @@ select {
   text-wrap: pretty;
 }
 
+/* The seal — the feeling the scene closes on — folded into the same
+   paragraph as its final beat. Warmer and brighter than the neutral scene
+   prose around it, so the emotional payoff still reads as the destination. */
+.scene-feeling {
+  color: var(--accent);
+  font-style: italic;
+}
+
 .muted {
   color: var(--ink-dim);
 }
