@@ -1,6 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
-import { patchSettings, resetAll, setApiKey, setGenerationMode, useStore } from '../state/store';
+import {
+  patchSettings,
+  resetAll,
+  setApiKey,
+  setApiProvider,
+  setGeminiApiKey,
+  setGenerationMode,
+  useStore,
+} from '../state/store';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
   loadVoices,
@@ -412,26 +420,76 @@ export function Settings() {
         ) : (
           <>
             <p className="note" style={{ marginBottom: '1.25rem' }}>
-              Journal → Reflect calls the Claude API directly from this browser, using your own
-              API key — there's no server in between. The journal entry you're reflecting on is
-              sent to Anthropic each time you do this; nothing else in the app is. The key itself
-              is stored in this browser's local storage, unencrypted, the same as everything else
-              the app remembers. Treat it like a password: anyone with access to this browser could
-              read it from developer tools. This is the option that works from your phone and on
-              the deployed site.
+              Journal → Reflect calls the provider below directly from this browser, using
+              your own key — there's no server in between. The journal entry you're reflecting
+              on is sent to that provider each time you do this; nothing else in the app is.
+              The key is stored in this browser's local storage, unencrypted, the same as
+              everything else the app remembers. Treat it like a password: anyone with access
+              to this browser could read it from developer tools. This is the option that
+              works from your phone and on the deployed site.
             </p>
-            <Row label="Anthropic API key">
-              <input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Anthropic API key"
-                placeholder="sk-ant-…"
-                value={state.apiKey ?? ''}
-                onChange={(e) => setApiKey(e.target.value.trim() || null)}
-                style={{ width: '14rem' }}
-              />
-            </Row>
+
+            <div className="chips" style={{ marginBottom: '1rem' }}>
+              <button
+                className="chip"
+                aria-pressed={state.apiProvider === 'anthropic'}
+                onClick={() => setApiProvider('anthropic')}
+              >
+                Claude
+              </button>
+              <button
+                className="chip"
+                aria-pressed={state.apiProvider === 'gemini'}
+                onClick={() => setApiProvider('gemini')}
+              >
+                Gemini
+              </button>
+            </div>
+
+            {state.apiProvider === 'anthropic' ? (
+              <>
+                <Row label="Anthropic API key" hint="From console.anthropic.com — starts with sk-ant-.">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label="Anthropic API key"
+                    placeholder="sk-ant-…"
+                    value={state.apiKey ?? ''}
+                    onChange={(e) => setApiKey(e.target.value.trim() || null)}
+                    style={{ width: '14rem' }}
+                  />
+                </Row>
+                {state.apiKey && !state.apiKey.startsWith('sk-ant-') && (
+                  <p className="note">
+                    That doesn't look like an Anthropic key (those start with{' '}
+                    <code>sk-ant-</code>) — double check you didn't paste a key for a
+                    different service.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <Row label="Gemini API key" hint="From Google AI Studio — starts with AIza.">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label="Gemini API key"
+                    placeholder="AIza…"
+                    value={state.geminiApiKey ?? ''}
+                    onChange={(e) => setGeminiApiKey(e.target.value.trim() || null)}
+                    style={{ width: '14rem' }}
+                  />
+                </Row>
+                {state.geminiApiKey && !state.geminiApiKey.startsWith('AIza') && (
+                  <p className="note">
+                    That doesn't look like a Gemini key (those start with <code>AIza</code>)
+                    — double check you didn't paste a key for a different service.
+                  </p>
+                )}
+              </>
+            )}
           </>
         )}
       </section>

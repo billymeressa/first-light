@@ -24,10 +24,10 @@ runs as a guided sequence rather than a screen of controls:
 4. **Complete** — the day is marked
 
 There's also a **Journal**: write a reflection, tap Reflect, and — using your own
-Claude API key — it proposes 3 new affirmations grounded in what you wrote, plus an
-update to an evolving **"person I want to be"** portrait. Nothing is saved until you
-review it: keep, edit, or discard each suggestion, and the portrait itself is editable
-before you commit. Every version of the portrait is kept, so it's a readable record of
+Claude or Gemini API key (your choice, in Settings) — it proposes 3 new affirmations
+grounded in what you wrote, plus an update to an evolving **"person I want to be"**
+portrait. Nothing is saved until you review it: keep, edit, or discard each suggestion,
+and the portrait itself is editable before you commit. Every version of the portrait is kept, so it's a readable record of
 how it's changed. Nothing about this is automatic — reflection only runs when you ask.
 
 Everything is local by default — no account, no server, no network requests.
@@ -49,7 +49,10 @@ what you wrote. See below.
 | `src/state/streak.ts` | Forgiving streak math (a streak survives until midnight). |
 | `src/components/Ritual.tsx` | The guided sequence — walks one entry, or a whole set in order. |
 | `src/components/Library.tsx` | Entries tab (write/retire) and Sets tab (build/reorder/edit). |
-| `src/ai/anthropic.ts` | Browser-side Claude API call (`dangerouslyAllowBrowser`), structured JSON output, journal entry → `{portrait, entries[]}`. |
+| `src/ai/prompt.ts` | Shared system prompt + `ReflectionResult` types — every generation path builds on this. |
+| `src/ai/anthropic.ts` | Browser-side Claude API call (`dangerouslyAllowBrowser`), structured JSON output. |
+| `src/ai/gemini.ts` | Browser-side Gemini REST call (`generativelanguage.googleapis.com`), Google's uppercase-typed Schema for structured output. |
+| `src/ai/local.ts` | Calls the local-only `/api/reflect` dev-server endpoint (see `vite.config.ts`) — no key, this machine only. |
 | `src/components/Journal.tsx` | Write/reflect, the review-before-save screen, and the portrait + its version history. |
 
 ## Notes on the design
@@ -114,6 +117,8 @@ Settings explains this before you can add a key.
   installed voice.
 - **Settings → Background tone → Reverb / space** controls how much the tone washes
   and lingers versus sitting flat.
-- **Settings → AI generation** adds your own Anthropic API key to enable Journal reflection.
+- **Settings → AI generation** picks a provider (Claude or Gemini) and takes your own key for
+  it to enable Journal reflection — or "This machine" to use a locally logged-in `claude` CLI
+  instead, no key needed (see the caveat above).
 - **Journal → Entries** is where you write; **Reflect** turns an entry into suggested
   affirmations plus an updated "person I want to be," both reviewable before saving.

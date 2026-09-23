@@ -67,9 +67,13 @@ export interface AppState {
   portraitHistory: PortraitVersion[];
   /** The user's own Anthropic API key, used only for journal reflection. */
   apiKey: string | null;
+  /** The user's own Google AI Studio / Gemini API key. */
+  geminiApiKey: string | null;
   /** 'local' shells out to the claude CLI on this machine (no key, laptop
-   * only); 'api' calls the Anthropic API from the browser with apiKey. */
+   * only); 'api' calls a cloud provider from the browser with a key. */
   generationMode: 'local' | 'api';
+  /** Which cloud provider 'api' mode uses. */
+  apiProvider: 'anthropic' | 'gemini';
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -98,11 +102,13 @@ function initialState(): AppState {
     journal: [],
     portraitHistory: [],
     apiKey: null,
+    geminiApiKey: null,
     // 'local' shells out to the claude CLI, which — confirmed on a real
     // machine, not just in testing — reliably times out after 3 minutes on
     // any substantive journal content. 'api' is the proven-reliable default
     // until that's fixed; local remains available as an opt-in in Settings.
     generationMode: 'api',
+    apiProvider: 'anthropic',
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
@@ -147,7 +153,9 @@ function load(): AppState {
       journal: parsed.journal ?? [],
       portraitHistory: parsed.portraitHistory ?? [],
       apiKey: parsed.apiKey ?? null,
+      geminiApiKey: parsed.geminiApiKey ?? null,
       generationMode: parsed.generationMode ?? base.generationMode,
+      apiProvider: parsed.apiProvider ?? base.apiProvider,
       seed: parsed.seed ?? base.seed,
     };
   } catch {
@@ -286,8 +294,16 @@ export function setApiKey(apiKey: string | null) {
   setState((s) => ({ ...s, apiKey }));
 }
 
+export function setGeminiApiKey(geminiApiKey: string | null) {
+  setState((s) => ({ ...s, geminiApiKey }));
+}
+
 export function setGenerationMode(generationMode: 'local' | 'api') {
   setState((s) => ({ ...s, generationMode }));
+}
+
+export function setApiProvider(apiProvider: 'anthropic' | 'gemini') {
+  setState((s) => ({ ...s, apiProvider }));
 }
 
 export function resetAll() {

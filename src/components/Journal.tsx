@@ -9,6 +9,7 @@ import {
   useStore,
 } from '../state/store';
 import { describeGenerationError, generateFromJournal, type GeneratedEntry } from '../ai/anthropic';
+import { generateFromJournalGemini } from '../ai/gemini';
 import { generateFromJournalLocal } from '../ai/local';
 
 type Tab = 'entries' | 'portrait';
@@ -48,20 +49,35 @@ export function Journal() {
   };
 
   const reflect = async (journalId: string, text: string) => {
-    if (state.generationMode === 'api' && !state.apiKey) {
+    const needsAnthropicKey =
+      state.generationMode === 'api' && state.apiProvider === 'anthropic' && !state.apiKey;
+    const needsGeminiKey =
+      state.generationMode === 'api' && state.apiProvider === 'gemini' && !state.geminiApiKey;
+    if (needsAnthropicKey || needsGeminiKey) {
       setReflectError({
         entryId: journalId,
         message: 'Add an API key in Settings → AI generation before reflecting.',
       });
       return;
     }
+
     setReflectError(null);
     setReflectingId(journalId);
     try {
       const result =
         state.generationMode === 'local'
           ? await generateFromJournalLocal(text, currentPortrait)
-          : await generateFromJournal({ journalText: text, currentPortrait, apiKey: state.apiKey! });
+          : state.apiProvider === 'gemini'
+            ? await generateFromJournalGemini({
+                journalText: text,
+                currentPortrait,
+                apiKey: state.geminiApiKey!,
+              })
+            : await generateFromJournal({
+                journalText: text,
+                currentPortrait,
+                apiKey: state.apiKey!,
+              });
       setSuggestions(result.entries.map(toSuggestion));
       setPortraitDraft(result.portrait);
       setReviewJournalId(journalId);
@@ -71,7 +87,11 @@ export function Journal() {
           ? err instanceof Error
             ? err.message
             : 'Local generation failed.'
-          : describeGenerationError(err);
+          : state.apiProvider === 'gemini'
+            ? err instanceof Error
+              ? err.message
+              : 'Gemini generation failed.'
+            : describeGenerationError(err);
       setReflectError({ entryId: journalId, message });
     } finally {
       setReflectingId(null);
