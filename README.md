@@ -23,21 +23,34 @@ runs as a guided sequence rather than a screen of controls:
    in as the final, emphasized beat — read aloud as a whole
 4. **Complete** — the day is marked
 
-Everything is local. No account, no server, no network requests — your streak,
-settings, and anything you write live in this browser's `localStorage`.
+There's also a **Journal**: write a reflection, tap Reflect, and — using your own
+Claude API key — it proposes 3 new affirmations grounded in what you wrote, plus an
+update to an evolving **"person I want to be"** portrait. Nothing is saved until you
+review it: keep, edit, or discard each suggestion, and the portrait itself is editable
+before you commit. Every version of the portrait is kept, so it's a readable record of
+how it's changed. Nothing about this is automatic — reflection only runs when you ask.
+
+Everything is local by default — no account, no server, no network requests.
+Your streak, settings, and anything you write live in this browser's
+`localStorage`. The one exception is opt-in: **Journal → Reflect** calls the
+Claude API directly using your own key, to generate new affirmations from
+what you wrote. See below.
 
 ## Architecture
 
 | Path | What it holds |
 | --- | --- |
 | `src/content/library.ts` | The 60 paired entries. Plain data — edit freely. |
-| `src/audio/binaural.ts` | Two hard-panned oscillators offset by the beat frequency, plus a pink-noise bed. All gain changes ramped. |
-| `src/audio/speech.ts` | On-device `SpeechSynthesis` wrapper with voice ranking and hang backstops. |
-| `src/audio/chime.ts` | Additive bell for transitions and the wake alarm. |
+| `src/audio/binaural.ts` | Two hard-panned oscillators offset by the beat frequency, a pink-noise bed with reverb and a drifting filter sweep, and a slow breathing tremolo on the whole mix. All gain changes ramped. |
+| `src/audio/reverb.ts` | A procedural stereo reverb impulse (no fetch), shared by the binaural engine and the chime. |
+| `src/audio/speech.ts` | On-device `SpeechSynthesis` wrapper — voice ranking (Eddy US preferred, graceful fallback) and hang backstops. |
+| `src/audio/chime.ts` | Additive bell with a reverb tail, for transitions and the wake alarm. |
 | `src/state/daily.ts` | Deterministic per-date draw that avoids the last 25 entries. |
 | `src/state/streak.ts` | Forgiving streak math (a streak survives until midnight). |
 | `src/components/Ritual.tsx` | The guided sequence — walks one entry, or a whole set in order. |
 | `src/components/Library.tsx` | Entries tab (write/retire) and Sets tab (build/reorder/edit). |
+| `src/ai/anthropic.ts` | Browser-side Claude API call (`dangerouslyAllowBrowser`), structured JSON output, journal entry → `{portrait, entries[]}`. |
+| `src/components/Journal.tsx` | Write/reflect, the review-before-save screen, and the portrait + its version history. |
 
 ## Notes on the design
 
@@ -45,6 +58,22 @@ settings, and anything you write live in this browser's `localStorage`.
 between two tones, one per ear — on speakers the channels mix in the air and you
 just hear a hum. The app says so in Settings. Treat it as atmosphere for the
 practice, not as a treatment for anything.
+
+**The reverb and filter sweep never touch the two carrier tones.** Only the
+noise bed is routed through the convolver and the drifting lowpass filter —
+running the actual binaural pair through a reverb would smear the precise
+per-ear frequency difference the whole effect depends on. The "hypnotic" wash,
+the breathing tremolo, and the drifting stereo reverb all live in the layers
+*around* the tones, never in them. Verified by inspecting the live audio graph:
+the tones connect straight to the master bus with no path through the
+convolver, while the reverb send only ever receives the noise bed.
+
+**Read-aloud gets no effects at all.** The Web Speech API doesn't expose
+synthesized speech as an audio node — there's no supported way to route it
+through a `ConvolverNode` or any other Web Audio effect, on any browser. Voice
+character is limited to what `SpeechSynthesisUtterance` exposes: voice choice,
+rate, pitch, volume. Eddy (US) is preferred as the default voice where the
+device has it installed, ranked ahead of everything else in `speech.ts`.
 
 **The wake alarm is in-app.** A browser can't reliably wake a sleeping phone, so
 the alarm rings when First Light is open on screen — fine on a bedside tablet or
@@ -62,6 +91,16 @@ speak every line twice in development, which makes the pacing — the one thing
 this app has to get right — impossible to judge while building. See
 `src/main.tsx`.
 
+**Journal reflection is the one thing that isn't local, and it's opt-in.**
+There's no backend — `Journal → Reflect` calls the Claude API straight from the
+browser using a key you supply, via the SDK's `dangerouslyAllowBrowser` option.
+Anthropic's own docs are blunt about what that means: the key sits in
+client-side code, readable from devtools by anyone with access to the browser.
+It's stored in `localStorage`, unencrypted, same as everything else. Only the
+journal entry being reflected on is sent, and only when you tap Reflect —
+nothing runs automatically, and nothing else in the app makes a network call.
+Settings explains this before you can add a key.
+
 ## Making it yours
 
 - **Library → Write one** adds your own affirmation and scene.
@@ -71,3 +110,10 @@ this app has to get right — impossible to judge while building. See
 - **Home → Your sets** starts a saved set as one sitting; the streak counts it
   the same as the daily pick, and "Recent" shows the set's name and length.
 - **Settings → Practice** locks the daily draw to a single theme, or sets the pace.
+- **Settings → Read aloud → Voice** overrides the automatic Eddy-first pick with any
+  installed voice.
+- **Settings → Background tone → Reverb / space** controls how much the tone washes
+  and lingers versus sitting flat.
+- **Settings → AI generation** adds your own Anthropic API key to enable Journal reflection.
+- **Journal → Entries** is where you write; **Reflect** turns an entry into suggested
+  affirmations plus an updated "person I want to be," both reviewable before saving.

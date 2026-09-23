@@ -19,4 +19,6 @@ export interface Entry {
   seal: string;
   /** True for entries the user wrote themselves. */
   custom?: boolean;
+  /** Present when this entry was generated from a journal reflection. */
+  source?: 'journal';
 }

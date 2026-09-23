@@ -1,3 +1,5 @@
+import { reverbImpulse } from './reverb';
+
 /**
  * Binaural tone generator.
  *
@@ -5,6 +7,14 @@
  * is perceived in the head rather than present in either channel, so this only
  * works on headphones — the UI says so. A quiet low-passed noise bed sits
  * underneath because bare sines are thin and fatiguing over ten minutes.
+ *
+ * The two carrier tones stay completely dry. Reverb, the filter sweep, and
+ * the stereo drift are all applied to the noise bed only — running the tones
+ * through a convolver would smear the precise per-ear frequency difference
+ * the whole effect depends on, which is the one thing here that must stay
+ * exact. The "hypnotic" quality — reverb wash, a slow breathing tremolo on
+ * the whole mix, a drifting filter — comes from everything around the tones,
+ * not the tones themselves.
  *
  * Every gain change is ramped. Setting an AudioParam directly on a running
  * oscillator produces an audible click, which is exactly the wrong texture for
@@ -25,6 +35,8 @@ export interface BinauralSettings {
   volume: number;
   /** 0–1, relative to volume. */
   noiseLevel: number;
+  /** 0–1. How much the noise bed washes through the reverb tail. */
+  reverbLevel: number;
 }
 
 export const DEFAULT_BINAURAL: BinauralSettings = {
@@ -32,6 +44,7 @@ export const DEFAULT_BINAURAL: BinauralSettings = {
   carrierHz: 150,
   volume: 0.35,
   noiseLevel: 0.25,
+  reverbLevel: 0.35,
 };
 
 /** Pink-ish noise via the Voss-McCartney approximation. Softer than white. */
@@ -64,6 +77,14 @@ export class BinauralEngine {
   private right: OscillatorNode | null = null;
   private noise: AudioBufferSourceNode | null = null;
   private noiseGain: GainNode | null = null;
+  private noiseFilter: BiquadFilterNode | null = null;
+  private reverbSend: GainNode | null = null;
+  // Slow LFOs driving the "hypnotic" motion — a breathing tremolo on the
+  // whole mix, a drifting lowpass sweep, and a slow pan on the reverb wash.
+  private breathGain: GainNode | null = null;
+  private breathLfo: OscillatorNode | null = null;
+  private filterLfo: OscillatorNode | null = null;
+  private wetPanLfo: OscillatorNode | null = null;
   private settings: BinauralSettings = { ...DEFAULT_BINAURAL };
   private running = false;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -94,11 +115,25 @@ export class BinauralEngine {
 
     const ctx = this.ctx;
     const now = ctx.currentTime;
-    const { beatHz, carrierHz, volume, noiseLevel } = this.settings;
+    const { beatHz, carrierHz, volume, noiseLevel, reverbLevel } = this.settings;
 
     this.master = ctx.createGain();
     this.master.gain.setValueAtTime(0.0001, now);
-    this.master.connect(ctx.destination);
+
+    // A slow amplitude "breath" on the whole mix, roughly the same 12-second
+    // cadence as the settle breath. Both ears scale together and in phase, so
+    // it never touches the interaural difference the binaural cue depends on
+    // — it just makes the tone feel alive instead of static.
+    this.breathGain = ctx.createGain();
+    this.breathGain.gain.setValueAtTime(1, now);
+    this.breathLfo = ctx.createOscillator();
+    this.breathLfo.frequency.setValueAtTime(1 / 12, now);
+    const breathDepth = ctx.createGain();
+    breathDepth.gain.setValueAtTime(0.07, now);
+    this.breathLfo.connect(breathDepth).connect(this.breathGain.gain);
+    this.breathLfo.start(now);
+
+    this.master.connect(this.breathGain).connect(ctx.destination);
 
     const half = beatHz / 2;
     this.left = ctx.createOscillator();
@@ -118,13 +153,41 @@ export class BinauralEngine {
     this.noise = ctx.createBufferSource();
     this.noise.buffer = makeNoiseBuffer(ctx);
     this.noise.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(520, now);
-    lp.Q.setValueAtTime(0.7, now);
+
+    this.noiseFilter = ctx.createBiquadFilter();
+    this.noiseFilter.type = 'lowpass';
+    this.noiseFilter.frequency.setValueAtTime(520, now);
+    this.noiseFilter.Q.setValueAtTime(0.7, now);
+
+    // The cutoff drifts instead of sitting still — most of what reads as
+    // "hypnotic" rather than merely "ambient" is that slow, unresolved motion.
+    this.filterLfo = ctx.createOscillator();
+    this.filterLfo.frequency.setValueAtTime(1 / 19, now);
+    const filterDepth = ctx.createGain();
+    filterDepth.gain.setValueAtTime(180, now);
+    this.filterLfo.connect(filterDepth).connect(this.noiseFilter.frequency);
+    this.filterLfo.start(now);
+
     this.noiseGain = ctx.createGain();
     this.noiseGain.gain.setValueAtTime(noiseLevel, now);
-    this.noise.connect(lp).connect(this.noiseGain).connect(this.master);
+    this.noise.connect(this.noiseFilter).connect(this.noiseGain);
+    this.noiseGain.connect(this.master); // dry
+
+    // Reverb send: only the noise bed washes through the convolver, with a
+    // slow pan drift on the wet signal for a sense of shifting space.
+    this.reverbSend = ctx.createGain();
+    this.reverbSend.gain.setValueAtTime(reverbLevel, now);
+    const convolver = ctx.createConvolver();
+    convolver.buffer = reverbImpulse(ctx);
+    const wetPan = ctx.createStereoPanner();
+    this.wetPanLfo = ctx.createOscillator();
+    this.wetPanLfo.frequency.setValueAtTime(1 / 23, now);
+    const wetPanDepth = ctx.createGain();
+    wetPanDepth.gain.setValueAtTime(0.6, now);
+    this.wetPanLfo.connect(wetPanDepth).connect(wetPan.pan);
+    this.wetPanLfo.start(now);
+
+    this.noiseGain.connect(this.reverbSend).connect(convolver).connect(wetPan).connect(this.master);
 
     this.left.start(now);
     this.right.start(now);
@@ -143,12 +206,13 @@ export class BinauralEngine {
   private apply() {
     if (!this.ctx || !this.master) return;
     const now = this.ctx.currentTime;
-    const { beatHz, carrierHz, volume, noiseLevel } = this.settings;
+    const { beatHz, carrierHz, volume, noiseLevel, reverbLevel } = this.settings;
     const half = beatHz / 2;
 
     this.left?.frequency.linearRampToValueAtTime(carrierHz - half, now + RAMP);
     this.right?.frequency.linearRampToValueAtTime(carrierHz + half, now + RAMP);
     this.noiseGain?.gain.linearRampToValueAtTime(noiseLevel, now + RAMP);
+    this.reverbSend?.gain.linearRampToValueAtTime(reverbLevel, now + RAMP);
     this.master.gain.cancelScheduledValues(now);
     this.master.gain.setValueAtTime(Math.max(this.master.gain.value, 0.0002), now);
     this.master.gain.exponentialRampToValueAtTime(Math.max(volume, 0.0002), now + RAMP);
@@ -164,14 +228,25 @@ export class BinauralEngine {
     this.master.gain.exponentialRampToValueAtTime(0.0001, now + FADE_OUT);
 
     const left = this.left, right = this.right, noise = this.noise;
+    const breathLfo = this.breathLfo, filterLfo = this.filterLfo, wetPanLfo = this.wetPanLfo;
     this.stopTimer = setTimeout(() => {
       try {
         left?.stop();
         right?.stop();
         noise?.stop();
+        breathLfo?.stop();
+        filterLfo?.stop();
+        wetPanLfo?.stop();
         left?.disconnect();
         right?.disconnect();
         noise?.disconnect();
+        breathLfo?.disconnect();
+        filterLfo?.disconnect();
+        wetPanLfo?.disconnect();
+        this.noiseFilter?.disconnect();
+        this.noiseGain?.disconnect();
+        this.reverbSend?.disconnect();
+        this.breathGain?.disconnect();
         this.master?.disconnect();
       } catch {
         // Nodes already torn down — nothing to do.
@@ -179,6 +254,12 @@ export class BinauralEngine {
       this.left = this.right = null;
       this.noise = null;
       this.noiseGain = null;
+      this.noiseFilter = null;
+      this.reverbSend = null;
+      this.breathGain = null;
+      this.breathLfo = null;
+      this.filterLfo = null;
+      this.wetPanLfo = null;
       this.master = null;
       this.stopTimer = null;
     }, (FADE_OUT + 0.2) * 1000);

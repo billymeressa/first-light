@@ -49,8 +49,11 @@ export function loadVoices(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-/** Voices that tend to sound least robotic, floated to the top of the picker. */
-const PREFERRED = ['samantha', 'serena', 'daniel', 'karen', 'moira', 'fiona', 'alex', 'ava', 'zoe'];
+// Eddy is the preferred default (the request was "Eddy/Eddie, US"). It's an
+// Apple voice available on recent macOS/iOS — where it exists, this floats it
+// to the top; where it doesn't, ranking falls through the rest of the list
+// instead of failing, since a device without it shouldn't lose read-aloud.
+const PREFERRED = ['eddy', 'eddie', 'samantha', 'serena', 'daniel', 'karen', 'moira', 'fiona', 'alex', 'ava', 'zoe'];
 
 export function rankVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   return [...voices]
@@ -61,6 +64,11 @@ export function rankVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice
       const aScore = ai === -1 ? 99 : ai;
       const bScore = bi === -1 ? 99 : bi;
       if (aScore !== bScore) return aScore - bScore;
+      // Among an equally-preferred name (e.g. regional Eddy variants), prefer
+      // US English specifically, per the request.
+      const aUS = a.lang === 'en-US' ? 0 : 1;
+      const bUS = b.lang === 'en-US' ? 0 : 1;
+      if (aUS !== bUS) return aUS - bUS;
       if (a.localService !== b.localService) return a.localService ? -1 : 1;
       return a.name.localeCompare(b.name);
     });

@@ -384,7 +384,7 @@ export function Library() {
                     <p className="line">{entry.affirmation}</p>
                     <p className="entry-meta">
                       {THEMES.find((t) => t.id === entry.theme)?.label}
-                      {entry.custom && ' · yours'}
+                      {entry.source === 'journal' ? ' · from your journal' : entry.custom && ' · yours'}
                     </p>
                   </div>
                   <div className="row-control">

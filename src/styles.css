@@ -665,6 +665,7 @@ input[type='range']::-moz-range-thumb {
 input[type='time'],
 select,
 input[type='text'],
+input[type='password'],
 textarea {
   background: hsl(var(--hue) 18% 50% / 0.08);
   border: 1px solid var(--line);

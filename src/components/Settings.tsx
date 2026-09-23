@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
-import { patchSettings, resetAll, useStore } from '../state/store';
+import { patchSettings, resetAll, setApiKey, useStore } from '../state/store';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
   loadVoices,
@@ -322,6 +322,18 @@ export function Settings() {
           />
         </Row>
 
+        <Row label="Reverb / space" hint="How much the tone washes and lingers, rather than sitting flat.">
+          <Slider
+            label="Reverb / space"
+            value={s.binaural.reverbLevel}
+            min={0}
+            max={0.8}
+            step={0.02}
+            onChange={(v) => setBinaural({ reverbLevel: v })}
+            format={(v) => `${Math.round((v / 0.8) * 100)}%`}
+          />
+        </Row>
+
         <button className="btn btn-ghost" style={{ marginTop: '1.1rem' }} onClick={togglePreview}>
           {previewing ? 'Stop preview' : 'Preview the tone'}
         </button>
@@ -362,6 +374,30 @@ export function Settings() {
             label="Reduce motion"
             checked={s.reduceMotion}
             onChange={(v) => patchSettings({ reduceMotion: v })}
+          />
+        </Row>
+      </section>
+
+      <section className="section">
+        <h2>AI generation</h2>
+        <p className="note" style={{ marginBottom: '1.25rem' }}>
+          Journal → Reflect calls the Claude API directly from this browser, using your own
+          API key — there's no server in between. The journal entry you're reflecting on is
+          sent to Anthropic each time you do this; nothing else in the app is. The key itself
+          is stored in this browser's local storage, unencrypted, the same as everything else
+          the app remembers. Treat it like a password: anyone with access to this browser could
+          read it from developer tools.
+        </p>
+        <Row label="Anthropic API key">
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Anthropic API key"
+            placeholder="sk-ant-…"
+            value={state.apiKey ?? ''}
+            onChange={(e) => setApiKey(e.target.value.trim() || null)}
+            style={{ width: '14rem' }}
           />
         </Row>
       </section>

@@ -2,7 +2,11 @@
  * A soft struck-bell tone, used for the wake alarm and for marking transitions
  * in the ritual. Additive: a fundamental plus two quiet inharmonic partials,
  * each with its own exponential decay, which reads as a bell rather than a beep.
+ * A reverb send on top gives it the shimmer and lingering tail of a real bell
+ * in a room, rather than stopping dead.
  */
+
+import { reverbImpulse } from './reverb';
 
 let ctx: AudioContext | null = null;
 
@@ -11,15 +15,21 @@ function context(): AudioContext {
   return ctx;
 }
 
-export async function chime(opts: { freq?: number; gain?: number; decay?: number } = {}) {
-  const { freq = 396, gain = 0.18, decay = 3.4 } = opts;
+export async function chime(opts: { freq?: number; gain?: number; decay?: number; reverb?: number } = {}) {
+  const { freq = 396, gain = 0.18, decay = 3.4, reverb = 0.45 } = opts;
   const c = context();
   if (c.state === 'suspended') await c.resume();
 
   const now = c.currentTime;
-  const out = c.createGain();
-  out.gain.setValueAtTime(gain, now);
-  out.connect(c.destination);
+  const dry = c.createGain();
+  dry.gain.setValueAtTime(gain, now);
+  dry.connect(c.destination);
+
+  const convolver = c.createConvolver();
+  convolver.buffer = reverbImpulse(c);
+  const wet = c.createGain();
+  wet.gain.setValueAtTime(gain * reverb, now);
+  dry.connect(convolver).connect(wet).connect(c.destination);
 
   // Inharmonic ratios give the tone a struck-metal quality.
   const partials = [
@@ -36,12 +46,18 @@ export async function chime(opts: { freq?: number; gain?: number; decay?: number
     g.gain.setValueAtTime(0.0001, now);
     g.gain.exponentialRampToValueAtTime(p.level, now + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, now + p.decay);
-    osc.connect(g).connect(out);
+    osc.connect(g).connect(dry);
     osc.start(now);
     osc.stop(now + p.decay + 0.1);
   }
 
-  setTimeout(() => out.disconnect(), (decay + 0.3) * 1000);
+  // The reverb tail rings on after the dry tone itself has decayed.
+  const tail = decay + reverbImpulse(c).duration;
+  setTimeout(() => {
+    dry.disconnect();
+    convolver.disconnect();
+    wet.disconnect();
+  }, tail * 1000);
 }
 
 /**

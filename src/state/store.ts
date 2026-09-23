@@ -37,6 +37,23 @@ export interface PracticeSet {
   entryIds: string[];
 }
 
+export interface JournalEntry {
+  id: string;
+  /** ISO datetime of when the entry was written. */
+  createdAt: string;
+  text: string;
+  /** Set once a reflection has run on this entry. */
+  reflectedAt?: string;
+  /** The custom entries this reflection generated and the user kept. */
+  generatedEntryIds?: string[];
+}
+
+export interface PortraitVersion {
+  text: string;
+  /** ISO datetime this version was written. */
+  date: string;
+}
+
 export interface AppState {
   version: 1;
   settings: Settings;
@@ -45,6 +62,11 @@ export interface AppState {
   hidden: string[];
   history: HistoryItem[];
   sets: PracticeSet[];
+  journal: JournalEntry[];
+  /** Oldest first; the last entry is the current portrait. */
+  portraitHistory: PortraitVersion[];
+  /** The user's own Anthropic API key, used only for journal reflection. */
+  apiKey: string | null;
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -70,6 +92,9 @@ function initialState(): AppState {
     hidden: [],
     history: [],
     sets: [],
+    journal: [],
+    portraitHistory: [],
+    apiKey: null,
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
@@ -111,6 +136,9 @@ function load(): AppState {
       hidden: parsed.hidden ?? [],
       history: migrateHistory(parsed.history),
       sets: parsed.sets ?? [],
+      journal: parsed.journal ?? [],
+      portraitHistory: parsed.portraitHistory ?? [],
+      apiKey: parsed.apiKey ?? null,
       seed: parsed.seed ?? base.seed,
     };
   } catch {
@@ -205,6 +233,48 @@ export function setSetEntries(id: string, entryIds: string[]) {
 
 export function deleteSet(id: string) {
   setState((s) => ({ ...s, sets: s.sets.filter((set) => set.id !== id) }));
+}
+
+export function addJournalEntry(text: string): string {
+  const id = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  setState((s) => ({
+    ...s,
+    journal: [...s.journal, { id, text, createdAt: new Date().toISOString() }],
+  }));
+  return id;
+}
+
+export function deleteJournalEntry(id: string) {
+  setState((s) => ({ ...s, journal: s.journal.filter((e) => e.id !== id) }));
+}
+
+/** Records that a reflection ran on this entry, appending any kept entries
+ * (an entry can be reflected on more than once). */
+export function recordReflection(journalId: string, newEntryIds: string[]) {
+  setState((s) => ({
+    ...s,
+    journal: s.journal.map((e) =>
+      e.id === journalId
+        ? {
+            ...e,
+            reflectedAt: new Date().toISOString(),
+            generatedEntryIds: [...(e.generatedEntryIds ?? []), ...newEntryIds],
+          }
+        : e,
+    ),
+  }));
+}
+
+/** Appends a new "person I want to be" version. The prior version is kept. */
+export function addPortraitVersion(text: string) {
+  setState((s) => ({
+    ...s,
+    portraitHistory: [...s.portraitHistory, { text, date: new Date().toISOString() }],
+  }));
+}
+
+export function setApiKey(apiKey: string | null) {
+  setState((s) => ({ ...s, apiKey }));
 }
 
 export function resetAll() {

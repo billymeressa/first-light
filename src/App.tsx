@@ -13,8 +13,9 @@ import { Ritual } from './components/Ritual';
 import { Streak } from './components/Streak';
 import { Settings } from './components/Settings';
 import { Library } from './components/Library';
+import { Journal } from './components/Journal';
 
-type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library';
+type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library' | 'journal';
 
 interface Session {
   entries: Entry[];
@@ -116,6 +117,7 @@ export default function App() {
     { id: 'home', label: 'Today' },
     { id: 'streak', label: 'Practice' },
     { id: 'library', label: 'Library' },
+    { id: 'journal', label: 'Journal' },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -194,6 +196,7 @@ export default function App() {
 
         {view === 'streak' && <Streak />}
         {view === 'library' && <Library />}
+        {view === 'journal' && <Journal />}
         {view === 'settings' && <Settings />}
       </div>
     </div>
