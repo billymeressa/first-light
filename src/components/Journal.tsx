@@ -27,7 +27,12 @@ export function Journal() {
   const [draft, setDraft] = useState('');
 
   const [reflectingId, setReflectingId] = useState<string | null>(null);
-  const [reflectError, setReflectError] = useState<string | null>(null);
+  // Keyed to the entry it came from, and rendered inline on that entry's
+  // card — a message floating above the compose box is easy to miss if
+  // you're looking at an entry further down the list when it resolves.
+  const [reflectError, setReflectError] = useState<{ entryId: string; message: string } | null>(
+    null,
+  );
 
   const [reviewJournalId, setReviewJournalId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -44,7 +49,10 @@ export function Journal() {
 
   const reflect = async (journalId: string, text: string) => {
     if (state.generationMode === 'api' && !state.apiKey) {
-      setReflectError('Add an API key in Settings → AI generation before reflecting.');
+      setReflectError({
+        entryId: journalId,
+        message: 'Add an API key in Settings → AI generation before reflecting.',
+      });
       return;
     }
     setReflectError(null);
@@ -58,13 +66,13 @@ export function Journal() {
       setPortraitDraft(result.portrait);
       setReviewJournalId(journalId);
     } catch (err) {
-      setReflectError(
+      const message =
         state.generationMode === 'local'
           ? err instanceof Error
             ? err.message
             : 'Local generation failed.'
-          : describeGenerationError(err),
-      );
+          : describeGenerationError(err);
+      setReflectError({ entryId: journalId, message });
     } finally {
       setReflectingId(null);
     }
@@ -238,12 +246,6 @@ export function Journal() {
             </button>
           </div>
 
-          {reflectError && (
-            <p className="note" style={{ margin: '1.25rem 0' }}>
-              {reflectError}
-            </p>
-          )}
-
           {journal.length === 0 ? (
             <p className="faint" style={{ fontSize: '0.85rem', marginTop: '1.5rem' }}>
               Nothing here yet.
@@ -276,6 +278,11 @@ export function Journal() {
                       </button>
                     </div>
                   </div>
+                  {reflectError?.entryId === entry.id && (
+                    <p className="note" style={{ marginTop: '0.75rem' }}>
+                      {reflectError.message}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

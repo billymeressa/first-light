@@ -98,7 +98,11 @@ function initialState(): AppState {
     journal: [],
     portraitHistory: [],
     apiKey: null,
-    generationMode: 'local',
+    // 'local' shells out to the claude CLI, which — confirmed on a real
+    // machine, not just in testing — reliably times out after 3 minutes on
+    // any substantive journal content. 'api' is the proven-reliable default
+    // until that's fixed; local remains available as an opt-in in Settings.
+    generationMode: 'api',
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
