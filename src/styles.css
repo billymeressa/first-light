@@ -135,20 +135,14 @@ select {
   text-wrap: balance;
 }
 
-.scene-line {
+/* Longer-form serif prose, dimmer than .affirmation — used for the evolving
+   "person I want to be" portrait. */
+.prose {
   font-family: var(--serif);
   font-size: clamp(1.05rem, 3.9vw, 1.22rem);
   line-height: 1.62;
   color: var(--ink-dim);
   text-wrap: pretty;
-}
-
-/* The seal — the feeling the scene closes on — folded into the same
-   paragraph as its final beat. Warmer and brighter than the neutral scene
-   prose around it, so the emotional payoff still reads as the destination. */
-.scene-feeling {
-  color: var(--accent);
-  font-style: italic;
 }
 
 .muted {
@@ -159,8 +153,8 @@ select {
   color: var(--ink-faint);
 }
 
-/* Set-practice progress marker, shown above the affirmation/scene while
-   working through more than one entry in a sitting. */
+/* Set-practice progress marker, shown above the affirmation while working
+   through more than one entry in a sitting. */
 .session-tag {
   font-size: 0.72rem;
   letter-spacing: 0.1em;
@@ -191,8 +185,7 @@ select {
 }
 
 /* `backwards`, not `both`: a forwards-filled animation keeps its final keyframe
-   applied forever and outranks normal declarations, which would pin every
-   revealed scene line at opacity 1 and defeat `.scene-line-past`. */
+   applied forever and outranks normal declarations set after it finishes. */
 .rise {
   animation: rise 1.1s var(--ease) backwards;
 }
@@ -776,6 +769,23 @@ button:focus-visible {
   gap: 0.4rem;
   font-size: 0.8rem;
   color: var(--ink-dim);
+}
+
+.voice-recorder .row-control {
+  flex-wrap: wrap;
+}
+
+.rec-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #e2574c;
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 /* ── Wake overlay ────────────────────────────────────────────────────── */

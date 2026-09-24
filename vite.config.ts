@@ -1,8 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { execFile } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { SYSTEM_PROMPT, JSON_SHAPE_INSTRUCTIONS, buildUserContent } from './src/ai/prompt';
+import { handleReflect, ReflectError } from './api/_lib/reflect';
 
 /** Reads and JSON-parses a connect middleware request body. */
 function readJsonBody(req) {
@@ -20,29 +18,22 @@ function readJsonBody(req) {
   });
 }
 
-/** Models sometimes wrap JSON in a ```json fence despite instructions not to. */
-function stripCodeFence(text) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return (fenced ? fenced[1] : text).trim();
-}
-
-// Tools the CLI shouldn't reach for on a pure text-generation call — this keeps
-// it fast and side-effect-free, and avoids ever blocking on a permission prompt
-// that has nothing to answer it non-interactively.
-const DISALLOWED_TOOLS =
-  'Bash,Read,Write,Edit,NotebookEdit,Glob,Grep,WebFetch,WebSearch,Task,TodoWrite,ExitPlanMode,AskUserQuestion';
-
 /**
- * Dev-server-only endpoint: POST /api/reflect shells out to the `claude` CLI
- * already logged in on this machine, so Journal reflection works without an
- * Anthropic API key. Only exists under `vite dev` — the deployed static build
- * has no server behind it, so this is a local-machine-only capability by
- * construction, not an oversight. See src/ai/local.ts for the browser side.
+ * Dev-server mirror of api/reflect.ts (the Vercel serverless function), so
+ * `npm run dev` exercises the exact same server-side handler — including the
+ * Claude/Gemini keys and the sign-in check — without needing `vercel dev`.
+ * `loadEnv` is required here because these keys are deliberately NOT
+ * VITE_-prefixed (that prefix means "safe to ship to the browser," which
+ * these are not); Vite only auto-loads prefixed vars into `process.env`.
  */
-function reflectPlugin() {
+function reflectPlugin(env) {
   return {
     name: 'first-light-reflect',
     configureServer(server) {
+      for (const [key, value] of Object.entries(env)) {
+        if (process.env[key] === undefined) process.env[key] = value;
+      }
+
       server.middlewares.use('/api/reflect', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
@@ -52,77 +43,28 @@ function reflectPlugin() {
 
         try {
           const body = await readJsonBody(req);
-          const journalText = typeof body.journalText === 'string' ? body.journalText : '';
-          const currentPortrait =
-            typeof body.currentPortrait === 'string' ? body.currentPortrait : null;
+          const authHeader = req.headers.authorization ?? '';
+          const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-          if (!journalText.trim()) {
-            res.statusCode = 400;
-            res.setHeader('content-type', 'application/json');
-            res.end(JSON.stringify({ error: 'journalText is required' }));
-            return;
-          }
-
-          const prompt = buildUserContent(journalText, currentPortrait);
-          const fullSystemPrompt = `${SYSTEM_PROMPT}\n\n${JSON_SHAPE_INSTRUCTIONS}`;
-
-          const stdout = await new Promise((resolve, reject) => {
-            execFile(
-              'claude',
-              [
-                '-p',
-                prompt,
-                '--output-format',
-                'json',
-                '--system-prompt',
-                fullSystemPrompt,
-                '--disallowedTools',
-                DISALLOWED_TOOLS,
-              ],
-              // A fresh, project-less cwd — running from the app's own repo
-              // would pull its CLAUDE.md and source tree into context for a
-              // task that has nothing to do with either.
-              { cwd: tmpdir(), timeout: 180_000, maxBuffer: 10 * 1024 * 1024 },
-              (err, stdoutData, stderrData) => {
-                if (err && err.killed) {
-                  reject(new Error('claude CLI timed out after 3 minutes. Try again, or switch to API key mode in Settings.'));
-                } else if (err) {
-                  reject(new Error(stderrData || err.message));
-                } else {
-                  resolve(stdoutData);
-                }
-              },
-            );
+          const result = await handleReflect({
+            accessToken,
+            journalText: typeof body.journalText === 'string' ? body.journalText : '',
+            currentPortrait: typeof body.currentPortrait === 'string' ? body.currentPortrait : null,
           });
 
-          const envelope = JSON.parse(stdout);
-          if (envelope.is_error) {
-            throw new Error(
-              typeof envelope.result === 'string'
-                ? envelope.result
-                : 'The claude CLI reported an error.',
-            );
-          }
-
-          const parsed = JSON.parse(stripCodeFence(envelope.result));
-
           res.setHeader('content-type', 'application/json');
-          res.end(JSON.stringify(parsed));
+          res.end(JSON.stringify(result));
         } catch (err) {
-          res.statusCode = 500;
+          res.statusCode = err instanceof ReflectError ? err.status : 500;
           res.setHeader('content-type', 'application/json');
-          res.end(
-            JSON.stringify({
-              error: err instanceof Error ? err.message : 'Local generation failed.',
-            }),
-          );
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Reflection failed.' }));
         }
       });
     },
   };
 }
 
-export default defineConfig({
-  plugins: [react(), reflectPlugin()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), reflectPlugin(loadEnv(mode, process.cwd(), ''))],
   server: { port: 5178 },
-});
+}));

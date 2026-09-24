@@ -11,10 +11,10 @@ export interface Settings {
   speech: SpeechSettings;
   /** Restrict the daily draw to one theme, or 'all' to rotate freely. */
   themeFocus: Theme | 'all';
-  /** Seconds each line of the scene is held before the next appears. */
-  scenePace: number;
+  /** How many affirmations make up today's default practice set. */
+  defaultSetSize: number;
   settleBreaths: number;
-  /** How many times the affirmation is said before moving to the scene. */
+  /** How many times each affirmation is said before moving on. */
   affirmationRepeats: number;
   alarmEnabled: boolean;
   /** Local "HH:MM". */
@@ -65,15 +65,6 @@ export interface AppState {
   journal: JournalEntry[];
   /** Oldest first; the last entry is the current portrait. */
   portraitHistory: PortraitVersion[];
-  /** The user's own Anthropic API key, used only for journal reflection. */
-  apiKey: string | null;
-  /** The user's own Google AI Studio / Gemini API key. */
-  geminiApiKey: string | null;
-  /** 'local' shells out to the claude CLI on this machine (no key, laptop
-   * only); 'api' calls a cloud provider from the browser with a key. */
-  generationMode: 'local' | 'api';
-  /** Which cloud provider 'api' mode uses. */
-  apiProvider: 'anthropic' | 'gemini';
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -83,7 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   binaural: { ...DEFAULT_BINAURAL },
   speech: { ...DEFAULT_SPEECH },
   themeFocus: 'all',
-  scenePace: 11,
+  defaultSetSize: 3,
   settleBreaths: 4,
   affirmationRepeats: 2,
   alarmEnabled: false,
@@ -101,14 +92,6 @@ function initialState(): AppState {
     sets: [],
     journal: [],
     portraitHistory: [],
-    apiKey: null,
-    geminiApiKey: null,
-    // 'local' shells out to the claude CLI, which — confirmed on a real
-    // machine, not just in testing — reliably times out after 3 minutes on
-    // any substantive journal content. 'api' is the proven-reliable default
-    // until that's fixed; local remains available as an opt-in in Settings.
-    generationMode: 'api',
-    apiProvider: 'anthropic',
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
@@ -152,15 +135,18 @@ function load(): AppState {
       sets: parsed.sets ?? [],
       journal: parsed.journal ?? [],
       portraitHistory: parsed.portraitHistory ?? [],
-      apiKey: parsed.apiKey ?? null,
-      geminiApiKey: parsed.geminiApiKey ?? null,
-      generationMode: parsed.generationMode ?? base.generationMode,
-      apiProvider: parsed.apiProvider ?? base.apiProvider,
       seed: parsed.seed ?? base.seed,
     };
   } catch {
     return initialState();
   }
+}
+
+/** Overwrite local state with a version pulled from the cloud (e.g. on
+ * sign-in). There's nothing device-local left to preserve — AI generation
+ * keys live only on the server now, not in AppState. */
+export function applyRemoteState(remote: AppState) {
+  setState((s) => ({ ...s, ...remote, settings: { ...s.settings, ...remote.settings } }));
 }
 
 let state: AppState = load();
@@ -288,22 +274,6 @@ export function addPortraitVersion(text: string) {
     ...s,
     portraitHistory: [...s.portraitHistory, { text, date: new Date().toISOString() }],
   }));
-}
-
-export function setApiKey(apiKey: string | null) {
-  setState((s) => ({ ...s, apiKey }));
-}
-
-export function setGeminiApiKey(geminiApiKey: string | null) {
-  setState((s) => ({ ...s, geminiApiKey }));
-}
-
-export function setGenerationMode(generationMode: 'local' | 'api') {
-  setState((s) => ({ ...s, generationMode }));
-}
-
-export function setApiProvider(apiProvider: 'anthropic' | 'gemini') {
-  setState((s) => ({ ...s, apiProvider }));
 }
 
 export function resetAll() {

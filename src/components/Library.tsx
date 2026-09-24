@@ -13,12 +13,11 @@ import {
   type PracticeSet,
 } from '../state/store';
 import { allEntries } from '../state/daily';
+import { VoiceRecorder } from './VoiceRecorder';
 
 const BLANK = {
   theme: 'confidence' as Theme,
   affirmation: '',
-  scene: '',
-  seal: '',
 };
 
 type Tab = 'entries' | 'sets';
@@ -33,6 +32,7 @@ export function Library() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ ...BLANK });
   const [filter, setFilter] = useState<Theme | 'all'>('all');
+  const [voiceOpenId, setVoiceOpenId] = useState<string | null>(null);
 
   // Set editor
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -49,24 +49,16 @@ export function Library() {
     setDraft({
       theme: entry.theme,
       affirmation: entry.affirmation,
-      scene: entry.scene.join('\n'),
-      seal: entry.seal,
     });
     setEditingId(entry.id);
   };
 
   const save = () => {
-    const scene = draft.scene
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (!draft.affirmation.trim() || !scene.length) return;
+    if (!draft.affirmation.trim()) return;
 
     const payload = {
       theme: draft.theme,
       affirmation: draft.affirmation.trim(),
-      scene,
-      seal: draft.seal.trim() || 'The feeling of this already being true.',
     };
 
     if (editingId === 'new') {
@@ -121,7 +113,7 @@ export function Library() {
   };
 
   const visible = filter === 'all' ? entries : entries.filter((e) => e.theme === filter);
-  const canSave = draft.affirmation.trim().length > 0 && draft.scene.trim().length > 0;
+  const canSave = draft.affirmation.trim().length > 0;
 
   if (editingId) {
     return (
@@ -148,30 +140,10 @@ export function Library() {
           <label>
             Affirmation — first person, present tense
             <textarea
-              rows={2}
+              rows={3}
               value={draft.affirmation}
               placeholder="I am someone who…"
               onChange={(e) => setDraft({ ...draft, affirmation: e.target.value })}
-            />
-          </label>
-
-          <label>
-            The scene — one moment per line
-            <textarea
-              rows={7}
-              value={draft.scene}
-              placeholder={'A room you know well.\nThe light is coming in low.\n…'}
-              onChange={(e) => setDraft({ ...draft, scene: e.target.value })}
-            />
-          </label>
-
-          <label>
-            The feeling to close on
-            <textarea
-              rows={2}
-              value={draft.seal}
-              placeholder="The steadiness of…"
-              onChange={(e) => setDraft({ ...draft, seal: e.target.value })}
             />
           </label>
 
@@ -393,11 +365,23 @@ export function Library() {
                         Edit
                       </button>
                     )}
+                    <button
+                      className="btn-quiet"
+                      aria-pressed={voiceOpenId === entry.id}
+                      onClick={() => setVoiceOpenId((id) => (id === entry.id ? null : entry.id))}
+                    >
+                      Voice
+                    </button>
                     <button className="btn-quiet" onClick={() => toggleHidden(entry.id)}>
                       {isHidden ? 'Restore' : 'Retire'}
                     </button>
                   </div>
                 </div>
+                {voiceOpenId === entry.id && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <VoiceRecorder entryId={entry.id} />
+                  </div>
+                )}
               </div>
             );
           })}

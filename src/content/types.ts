@@ -13,10 +13,6 @@ export interface Entry {
   theme: Theme;
   /** First person, present tense. The line that gets spoken aloud. */
   affirmation: string;
-  /** The scene to picture, one beat per line, revealed slowly. */
-  scene: string[];
-  /** The feeling to hold as the practice closes. */
-  seal: string;
   /** True for entries the user wrote themselves. */
   custom?: boolean;
   /** Present when this entry was generated from a journal reflection. */

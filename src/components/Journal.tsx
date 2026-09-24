@@ -8,9 +8,8 @@ import {
   recordReflection,
   useStore,
 } from '../state/store';
-import { describeGenerationError, generateFromJournal, type GeneratedEntry } from '../ai/anthropic';
-import { generateFromJournalGemini } from '../ai/gemini';
-import { generateFromJournalLocal } from '../ai/local';
+import { generateFromJournal, type GeneratedEntry } from '../ai/reflect';
+import { useSession } from '../state/cloud';
 
 type Tab = 'entries' | 'portrait';
 
@@ -24,6 +23,7 @@ function toSuggestion(e: GeneratedEntry): Suggestion {
 
 export function Journal() {
   const state = useStore();
+  const { session } = useSession();
   const [tab, setTab] = useState<Tab>('entries');
   const [draft, setDraft] = useState('');
 
@@ -49,50 +49,23 @@ export function Journal() {
   };
 
   const reflect = async (journalId: string, text: string) => {
-    const needsAnthropicKey =
-      state.generationMode === 'api' && state.apiProvider === 'anthropic' && !state.apiKey;
-    const needsGeminiKey =
-      state.generationMode === 'api' && state.apiProvider === 'gemini' && !state.geminiApiKey;
-    if (needsAnthropicKey || needsGeminiKey) {
-      setReflectError({
-        entryId: journalId,
-        message: 'Add an API key in Settings → AI generation before reflecting.',
-      });
+    if (!session) {
+      setReflectError({ entryId: journalId, message: 'Sign in (Account, in the nav) to use Journal reflection.' });
       return;
     }
 
     setReflectError(null);
     setReflectingId(journalId);
     try {
-      const result =
-        state.generationMode === 'local'
-          ? await generateFromJournalLocal(text, currentPortrait)
-          : state.apiProvider === 'gemini'
-            ? await generateFromJournalGemini({
-                journalText: text,
-                currentPortrait,
-                apiKey: state.geminiApiKey!,
-              })
-            : await generateFromJournal({
-                journalText: text,
-                currentPortrait,
-                apiKey: state.apiKey!,
-              });
+      const result = await generateFromJournal(text, currentPortrait);
       setSuggestions(result.entries.map(toSuggestion));
       setPortraitDraft(result.portrait);
       setReviewJournalId(journalId);
     } catch (err) {
-      const message =
-        state.generationMode === 'local'
-          ? err instanceof Error
-            ? err.message
-            : 'Local generation failed.'
-          : state.apiProvider === 'gemini'
-            ? err instanceof Error
-              ? err.message
-              : 'Gemini generation failed.'
-            : describeGenerationError(err);
-      setReflectError({ entryId: journalId, message });
+      setReflectError({
+        entryId: journalId,
+        message: err instanceof Error ? err.message : 'Reflection failed.',
+      });
     } finally {
       setReflectingId(null);
     }
@@ -107,14 +80,12 @@ export function Journal() {
     const newIds: string[] = [];
     for (const s of suggestions) {
       if (!s.keep) continue;
-      if (!s.affirmation.trim() || s.scene.every((l) => !l.trim())) continue;
+      if (!s.affirmation.trim()) continue;
       const id = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       addCustomEntry({
         id,
         theme: s.theme,
         affirmation: s.affirmation.trim(),
-        scene: s.scene.map((l) => l.trim()).filter(Boolean),
-        seal: s.seal.trim() || 'The feeling of this already being true.',
         custom: true,
         source: 'journal',
       });
@@ -181,27 +152,9 @@ export function Journal() {
               <label>
                 Affirmation
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={s.affirmation}
                   onChange={(e) => updateSuggestion(i, { affirmation: e.target.value })}
-                />
-              </label>
-
-              <label>
-                Scene — one moment per line
-                <textarea
-                  rows={5}
-                  value={s.scene.join('\n')}
-                  onChange={(e) => updateSuggestion(i, { scene: e.target.value.split('\n') })}
-                />
-              </label>
-
-              <label>
-                The feeling to close on
-                <textarea
-                  rows={2}
-                  value={s.seal}
-                  onChange={(e) => updateSuggestion(i, { seal: e.target.value })}
                 />
               </label>
             </div>
@@ -251,6 +204,12 @@ export function Journal() {
 
       {tab === 'entries' ? (
         <>
+          {!session && (
+            <p className="note" style={{ marginBottom: '1.25rem' }}>
+              Reflect uses this app's built-in AI, which is why it's tied to an account — sign
+              in from <b>Account</b> in the nav to use it. Writing entries works either way.
+            </p>
+          )}
           <div className="editor" style={{ paddingTop: 0 }}>
             <label>
               What's on your mind
@@ -311,7 +270,7 @@ export function Journal() {
       ) : (
         <>
           {currentPortrait ? (
-            <p className="scene-line rise" style={{ marginBottom: '2rem', whiteSpace: 'pre-wrap' }}>
+            <p className="prose rise" style={{ marginBottom: '2rem', whiteSpace: 'pre-wrap' }}>
               {currentPortrait}
             </p>
           ) : (

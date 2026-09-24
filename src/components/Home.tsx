@@ -5,7 +5,7 @@ import type { StreakStats } from '../state/streak';
 import { greeting } from '../lib/date';
 
 interface Props {
-  entry: Entry;
+  entries: Entry[];
   stats: StreakStats;
   alarmTime: string | null;
   sets: PracticeSet[];
@@ -14,8 +14,8 @@ interface Props {
   onViewStreak: () => void;
 }
 
-export function Home({ entry, stats, alarmTime, sets, onBegin, onBeginSet, onViewStreak }: Props) {
-  const themeLabel = THEMES.find((t) => t.id === entry.theme)?.label ?? entry.theme;
+export function Home({ entries, stats, alarmTime, sets, onBegin, onBeginSet, onViewStreak }: Props) {
+  const themeLabels = [...new Set(entries.map((e) => THEMES.find((t) => t.id === e.theme)?.label ?? e.theme))];
 
   return (
     <div className="home-main">
@@ -23,19 +23,20 @@ export function Home({ entry, stats, alarmTime, sets, onBegin, onBeginSet, onVie
         <span className="eyebrow">{greeting()}</span>
         {stats.doneToday ? (
           <>
-            <p className="affirmation">{entry.affirmation}</p>
+            <p className="affirmation">{entries[0]?.affirmation}</p>
             <p className="muted" style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
-              Today's practice is done. You can sit with it again any time.
+              Today's practice — {entries.length} affirmation{entries.length === 1 ? '' : 's'} — is
+              done. You can sit with it again any time.
             </p>
           </>
         ) : (
           <>
             <p className="affirmation">
-              One line, one scene.
+              {entries.length} lines to carry with you.
               <br />
               <span className="muted">A few minutes before the day starts.</span>
             </p>
-            <span className="theme-tag">Today · {themeLabel}</span>
+            <span className="theme-tag">Today · {themeLabels.join(' · ')}</span>
           </>
         )}
       </div>
