@@ -8,7 +8,7 @@ import { binaural } from './audio/binaural';
 import { loadVoices } from './audio/speech';
 import { gentleAlarm } from './audio/chime';
 import { dayKey, msUntilNext } from './lib/date';
-import { useCloudSync, useSession } from './state/cloud';
+import { useCloudSync } from './state/cloud';
 import { Home } from './components/Home';
 import { Ritual } from './components/Ritual';
 import { Streak } from './components/Streak';
@@ -16,8 +16,19 @@ import { Settings } from './components/Settings';
 import { Library } from './components/Library';
 import { Journal } from './components/Journal';
 import { Account } from './components/Account';
+import { TabBar, type Tab } from './components/TabBar';
 
-type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library' | 'journal' | 'account';
+type View = Tab | 'ritual' | 'account';
+
+/** Titles for the slim top bar. 'home' is deliberately absent — the Today
+ * screen is the one place the app should feel like a moment, not a page. */
+const TITLES: Partial<Record<View, string>> = {
+  streak: 'Practice',
+  library: 'Library',
+  journal: 'Journal',
+  settings: 'Settings',
+  account: 'Account',
+};
 
 interface Session {
   entries: Entry[];
@@ -45,7 +56,6 @@ export default function App() {
   const [waking, setWaking] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const stopAlarm = useRef<(() => void) | null>(null);
-  const { session: authSession } = useSession();
   useCloudSync(state);
 
   const todaysSet = useMemo(
@@ -120,15 +130,6 @@ export default function App() {
     beginRitual();
   };
 
-  const nav: { id: View; label: string }[] = [
-    { id: 'home', label: 'Today' },
-    { id: 'streak', label: 'Practice' },
-    { id: 'library', label: 'Library' },
-    { id: 'journal', label: 'Journal' },
-    { id: 'settings', label: 'Settings' },
-    { id: 'account', label: authSession ? 'Account' : 'Sign in' },
-  ];
-
   return (
     <div
       className={`app${state.settings.reduceMotion ? ' reduce-motion' : ''}`}
@@ -158,21 +159,18 @@ export default function App() {
         </div>
       )}
 
-      <div className="screen">
+      <div className={`screen${view === 'ritual' ? '' : ' has-tabbar'}`}>
         {view !== 'ritual' && (
           <header className="topbar">
-            <span className="eyebrow wordmark">First Light</span>
-            <nav className="nav">
-              {nav.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => setView(n.id)}
-                  aria-current={view === n.id ? 'page' : undefined}
-                >
-                  {n.label}
-                </button>
-              ))}
-            </nav>
+            {view === 'account' ? (
+              <button className="back-btn" onClick={() => setView('settings')}>
+                ‹ Settings
+              </button>
+            ) : (
+              <span className="eyebrow wordmark">
+                {TITLES[view] ?? 'First Light'}
+              </span>
+            )}
           </header>
         )}
 
@@ -205,9 +203,11 @@ export default function App() {
         {view === 'streak' && <Streak />}
         {view === 'library' && <Library />}
         {view === 'journal' && <Journal />}
-        {view === 'settings' && <Settings />}
+        {view === 'settings' && <Settings onOpenAccount={() => setView('account')} />}
         {view === 'account' && <Account />}
       </div>
+
+      {view !== 'ritual' && <TabBar current={view} onSelect={setView} />}
     </div>
   );
 }

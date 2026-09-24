@@ -298,27 +298,22 @@ export function Library() {
 
   return (
     <div className="rise">
+      {/* No heading — the top bar already names the screen. The segmented
+          control and its matching action share one row instead. */}
       <div className="page-head">
-        <h1 className="affirmation" style={{ fontSize: '1.5rem' }}>
-          Library
-        </h1>
-        {tab === 'entries' ? (
-          <button className="btn btn-ghost" onClick={openNew}>
-            Write one
+        <div className="chips">
+          <button className="chip" aria-pressed={tab === 'entries'} onClick={() => setTab('entries')}>
+            Entries
           </button>
-        ) : (
-          <button className="btn btn-ghost" onClick={openNewSet}>
-            New set
+          <button className="chip" aria-pressed={tab === 'sets'} onClick={() => setTab('sets')}>
+            Sets{state.sets.length ? ` · ${state.sets.length}` : ''}
           </button>
-        )}
-      </div>
-
-      <div className="chips" style={{ marginBottom: '1.5rem' }}>
-        <button className="chip" aria-pressed={tab === 'entries'} onClick={() => setTab('entries')}>
-          Entries
-        </button>
-        <button className="chip" aria-pressed={tab === 'sets'} onClick={() => setTab('sets')}>
-          Sets{state.sets.length ? ` · ${state.sets.length}` : ''}
+        </div>
+        <button
+          className="btn-quiet action-link"
+          onClick={tab === 'entries' ? openNew : openNewSet}
+        >
+          {tab === 'entries' ? '+ Write one' : '+ New set'}
         </button>
       </div>
 

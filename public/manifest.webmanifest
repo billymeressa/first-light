@@ -1,18 +1,38 @@
 {
   "name": "First Light",
   "short_name": "First Light",
-  "description": "A quiet morning ritual: one affirmation, one scene to picture.",
+  "description": "A quiet morning ritual: a few affirmations, a theta tone underneath, and a streak that doesn't nag you.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0d0f18",
-  "theme_color": "#0d0f18",
+  "background_color": "#0b0d14",
+  "theme_color": "#0b0d14",
+  "categories": ["health", "lifestyle"],
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

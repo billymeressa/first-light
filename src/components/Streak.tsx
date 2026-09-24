@@ -14,10 +14,7 @@ export function Streak() {
 
   return (
     <div className="rise">
-      <h1 className="affirmation" style={{ fontSize: '1.6rem' }}>
-        Your practice
-      </h1>
-
+      {/* No heading — the top bar already names the screen. */}
       <div className="stat-row">
         <div className="stat">
           <b>{stats.current}</b>

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
 import { patchSettings, resetAll, useStore } from '../state/store';
 import { cloudSupported, useSession } from '../state/cloud';
+import { IconAccount, IconChevron } from './Icons';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
   loadVoices,
@@ -84,7 +85,11 @@ function Slider({
   );
 }
 
-export function Settings() {
+interface SettingsProps {
+  onOpenAccount: () => void;
+}
+
+export function Settings({ onOpenAccount }: SettingsProps) {
   const state = useStore();
   const { session } = useSession();
   const s = state.settings;
@@ -124,9 +129,20 @@ export function Settings() {
 
   return (
     <div className="rise">
-      <h1 className="affirmation" style={{ fontSize: '1.6rem', marginBottom: '2rem' }}>
-        Settings
-      </h1>
+      {cloudSupported && (
+        <button className="account-row" onClick={onOpenAccount}>
+          <span className="account-avatar">
+            <IconAccount />
+          </span>
+          <span className="account-text">
+            <b>{session ? (session.user.email ?? 'Your account') : 'Sign in'}</b>
+            <small>{session ? 'Synced across your devices' : 'Sync your practice + use Reflect'}</small>
+          </span>
+          <span className="faint">
+            <IconChevron />
+          </span>
+        </button>
+      )}
 
       <section className="section">
         <h2>Practice</h2>
@@ -388,7 +404,7 @@ export function Settings() {
         <p className="note">
           Journal → Reflect uses this app's own Claude/Gemini access — there's no key for you to
           manage. Since every reflection costs the app something, it only works when you're
-          signed in: see <b>Account</b> in the nav.
+          signed in — use the account row at the top of this screen.
         </p>
       </section>
 
@@ -398,14 +414,14 @@ export function Settings() {
           {session ? (
             <>
               Signed in as <b>{session.user.email}</b> — your streak, settings, and everything
-              you've written sync to your account. Manage sign-in from <b>Account</b> in the
-              nav.
+              you've written sync to your account. Manage sign-in from the account row at the
+              top of this screen.
             </>
           ) : cloudSupported ? (
             <>
-              Everything currently lives in this browser only — sign in from{' '}
-              <b>{'Account'}</b> in the nav to sync your streak, settings, and everything
-              you've written across devices. Clearing site data erases anything not synced.
+              Everything currently lives in this browser only — sign in from the account row at
+              the top of this screen to sync your streak, settings, and everything you've
+              written across devices. Clearing site data erases anything not synced.
             </>
           ) : (
             <>

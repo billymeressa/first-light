@@ -36,7 +36,30 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
+
+/* Chrome, not content: a native app doesn't let you accidentally select a tab
+   label or flash a grey box when you tap one. Prose, affirmations and anything
+   the user wrote stay selectable via the opt-in below. */
+button,
+.tabbar,
+.topbar,
+.chips,
+.row-label {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.affirmation,
+.prose,
+.line,
+p,
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button {
@@ -45,6 +68,8 @@ button {
   background: none;
   border: none;
   cursor: pointer;
+  /* Kills the legacy 300ms click delay on touch without disabling scroll. */
+  touch-action: manipulation;
 }
 
 input,
@@ -52,6 +77,15 @@ textarea,
 select {
   font: inherit;
   color: inherit;
+}
+
+/* Safari zooms the whole page when a focused field is under 16px. Every text
+   field is floored there, and only the visual size is scaled back down, so
+   tapping into the journal no longer yanks the layout around. */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
 }
 
 /* ── Shell ───────────────────────────────────────────────────────────── */
@@ -111,10 +145,16 @@ select {
   width: 100%;
   max-width: 34rem;
   margin: 0 auto;
-  padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem
+  padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem
     max(1.5rem, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
+}
+
+/* Clear the fixed tab bar: its own height plus whatever the home indicator
+   takes, so the last row of a long list isn't parked underneath it. */
+.screen.has-tabbar {
+  padding-bottom: calc(4.6rem + env(safe-area-inset-bottom) + 1rem);
 }
 
 /* ── Type ────────────────────────────────────────────────────────────── */
@@ -230,28 +270,44 @@ select {
   color: var(--ink);
 }
 
-.btn-primary:hover {
-  background: hsl(var(--hue) 60% 62% / 0.26);
-}
-
 .btn-ghost {
   border: 1px solid var(--line);
   color: var(--ink-dim);
 }
 
-.btn-ghost:hover {
-  color: var(--ink);
-  border-color: hsl(var(--hue) 30% 40%);
-}
-
 .btn-quiet {
-  padding: 0.5rem 0.25rem;
+  /* Padded to a 44px touch target even though it reads as a bare text link. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.4rem;
   color: var(--ink-faint);
   font-size: 0.85rem;
 }
 
-.btn-quiet:hover {
-  color: var(--ink-dim);
+/* Hover only where a real pointer exists. On touch these otherwise "stick"
+   after a tap, leaving a button looking permanently hovered. */
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: hsl(var(--hue) 60% 62% / 0.26);
+  }
+
+  .btn-ghost:hover {
+    color: var(--ink);
+    border-color: hsl(var(--hue) 30% 40%);
+  }
+
+  .btn-quiet:hover {
+    color: var(--ink-dim);
+  }
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-quiet:active:not(:disabled) {
+  opacity: 0.6;
 }
 
 .btn:disabled {
@@ -283,38 +339,127 @@ select {
   white-space: nowrap;
 }
 
-/* On a narrow phone the wordmark and four nav items can't share a row without
-   the wordmark wrapping to two lines. The nav is the useful half. */
-@media (max-width: 26rem) {
-  .wordmark {
-    display: none;
-  }
-
-  .topbar {
-    justify-content: center;
-  }
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: -0.35rem;
+  padding: 0.5rem 0.35rem;
+  font-size: 0.95rem;
+  color: var(--accent);
 }
 
-.nav {
+/* ── Tab bar ─────────────────────────────────────────────────────────────
+   Fixed to the bottom, translucent over the aurora, and inset-aware so the
+   labels clear the home indicator rather than sitting under it. */
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
   display: flex;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
+  background: hsl(var(--hue) 22% 7% / 0.82);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border-top: 1px solid hsl(var(--hue) 18% 26% / 0.6);
 }
 
-.nav button {
-  padding: 0.4rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
+.tab {
+  flex: 1;
+  max-width: 6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  /* 44px is the smallest target a thumb reliably hits. */
+  min-height: 44px;
+  padding: 0.4rem 0.25rem;
+  border-radius: 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
-  transition: color 0.3s, background 0.3s;
+  transition: color 0.25s var(--ease), transform 0.12s var(--ease);
 }
 
-.nav button:hover {
-  color: var(--ink-dim);
+.tab[aria-current='page'] {
+  color: var(--accent);
 }
 
-.nav button[aria-current='page'] {
-  color: var(--ink);
-  background: hsl(var(--hue) 30% 60% / 0.1);
+.tab:active {
+  transform: scale(0.92);
+}
+
+@media (hover: hover) {
+  .tab:hover {
+    color: var(--ink-dim);
+  }
+
+  .tab[aria-current='page']:hover {
+    color: var(--accent);
+  }
+}
+
+/* ── Account row (Settings) ──────────────────────────────────────────── */
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  margin-bottom: 2rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: hsl(var(--hue) 20% 50% / 0.05);
+  text-align: left;
+  transition: border-color 0.3s var(--ease), transform 0.12s var(--ease);
+}
+
+.account-row:active {
+  transform: scale(0.985);
+}
+
+@media (hover: hover) {
+  .account-row:hover {
+    border-color: hsl(var(--hue) 30% 40%);
+  }
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: hsl(var(--hue) 45% 60% / 0.14);
+  color: var(--accent);
+}
+
+.account-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.account-text b {
+  font-size: 0.92rem;
+  font-weight: 500;
+  /* Emails are long and arbitrary — truncate rather than reflow the row. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-text small {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
 }
 
 /* ── Home ────────────────────────────────────────────────────────────── */
@@ -724,12 +869,20 @@ button:focus-visible {
 }
 
 .chip {
-  padding: 0.45rem 0.85rem;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.9rem;
   border-radius: 999px;
   border: 1px solid var(--line);
   font-size: 0.82rem;
   color: var(--ink-dim);
-  transition: all 0.3s var(--ease);
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease),
+    background 0.3s var(--ease), transform 0.12s var(--ease);
+}
+
+.chip:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 .chip[aria-pressed='true'] {
@@ -769,6 +922,37 @@ button:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+}
+
+/* On a phone a trailing action row leaves the affirmation about half the
+   width, wrapping a single line into four. Stack instead: text full width,
+   actions on their own row underneath. */
+@media (max-width: 30rem) {
+  .entry-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .entry-head .row-control {
+    justify-content: flex-start;
+    margin-left: -0.4rem;
+  }
+}
+
+/* The iOS-style trailing action in a page head: reads as a control, not a
+   heavyweight button competing with the screen's primary action. */
+.action-link {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+
+@media (hover: hover) {
+  .action-link:hover {
+    color: var(--accent);
+    opacity: 0.8;
+  }
 }
 
 .entry-card p.line {

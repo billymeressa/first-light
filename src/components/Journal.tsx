@@ -50,7 +50,10 @@ export function Journal() {
 
   const reflect = async (journalId: string, text: string) => {
     if (!session) {
-      setReflectError({ entryId: journalId, message: 'Sign in (Account, in the nav) to use Journal reflection.' });
+      setReflectError({
+        entryId: journalId,
+        message: 'Sign in from Settings → Account to use Journal reflection.',
+      });
       return;
     }
 
@@ -187,12 +190,6 @@ export function Journal() {
   // ── Entries / Portrait tabs ─────────────────────────────────────────────
   return (
     <div className="rise">
-      <div className="page-head">
-        <h1 className="affirmation" style={{ fontSize: '1.5rem' }}>
-          Journal
-        </h1>
-      </div>
-
       <div className="chips" style={{ marginBottom: '1.5rem' }}>
         <button className="chip" aria-pressed={tab === 'entries'} onClick={() => setTab('entries')}>
           Entries
@@ -207,7 +204,7 @@ export function Journal() {
           {!session && (
             <p className="note" style={{ marginBottom: '1.25rem' }}>
               Reflect uses this app's built-in AI, which is why it's tied to an account — sign
-              in from <b>Account</b> in the nav to use it. Writing entries works either way.
+              in from <b>Settings → Account</b> to use it. Writing entries works either way.
             </p>
           )}
           <div className="editor" style={{ paddingTop: 0 }}>
