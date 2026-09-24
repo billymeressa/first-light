@@ -30,33 +30,78 @@ export function eligibleEntries(state: AppState): Entry[] {
   return pool;
 }
 
+/** Seeded PRNG (mulberry32) — small, fast, good enough distribution for a
+ * deterministic daily shuffle. */
+function mulberry32(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Deterministic Fisher–Yates, seeded by a string so the same seed always
+ * produces the same shuffle. */
+function seededShuffle<T>(items: T[], seedStr: string): T[] {
+  const rand = mulberry32(hash(seedStr));
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /**
- * The entry for a given day. Deterministic — the same date and the same install
- * always produce the same draw, so closing and reopening the app mid-practice
- * doesn't swap the affirmation out from under you.
+ * A small, shuffled set of affirmations for the given day — practiced
+ * together in one sitting, since a single line reads as too short on its own.
+ * Deterministic per date + install, so closing and reopening the app
+ * mid-practice doesn't swap the set out from under you, and "Sit with it
+ * again" naturally replays the same set.
  *
- * Recently-seen entries are excluded first, so a 60-entry library cycles for
- * weeks before repeating rather than landing on the same line twice in a week.
+ * Entries seen in just-enough recent history are excluded first, sized to
+ * leave exactly `setSize` fresh candidates — the whole library cycles through
+ * before anything repeats, rather than reshuffling the same handful early.
  */
-export function entryForDay(state: AppState, date: string): Entry {
+export function defaultSetForDay(state: AppState, date: string, setSize: number): Entry[] {
   const pool = eligibleEntries(state);
-  if (!pool.length) return LIBRARY[0];
+  if (!pool.length) return LIBRARY.slice(0, Math.max(1, setSize));
 
-  const lookback = Math.min(Math.max(pool.length - 1, 0), 25);
-  const recent = new Set(
-    state.history
-      .filter((h) => h.date < date)
-      .slice(-lookback)
-      .flatMap((h) => h.entryIds),
-  );
+  const size = Math.min(Math.max(setSize, 1), pool.length);
 
-  const fresh = pool.filter((e) => !recent.has(e.id));
-  const candidates = fresh.length ? fresh : pool;
+  const targetRecent = Math.max(pool.length - size, 0);
+  const recent = new Set<string>();
+  const pastHistory = [...state.history]
+    .filter((h) => h.date < date)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  outer: for (const h of pastHistory) {
+    for (const id of h.entryIds) {
+      if (recent.size >= targetRecent) break outer;
+      recent.add(id);
+    }
+  }
 
-  // Sorted so the index is stable even if entry insertion order changes.
+  const candidates = pool.filter((e) => !recent.has(e.id));
+  if (candidates.length < size) {
+    // Wrapping into a new cycle — top up with whatever's left, still
+    // avoiding duplicates within today's own set.
+    const chosen = new Set(candidates.map((e) => e.id));
+    for (const e of pool) {
+      if (candidates.length >= size) break;
+      if (!chosen.has(e.id)) {
+        candidates.push(e);
+        chosen.add(e.id);
+      }
+    }
+  }
+
+  // Sorted first so the shuffle input is stable even if entry insertion
+  // order changes, then seeded-shuffled for the day's practice order.
   const ordered = [...candidates].sort((a, b) => a.id.localeCompare(b.id));
-  const index = hash(`${date}:${state.seed}`) % ordered.length;
-  return ordered[index];
+  return seededShuffle(ordered, `${date}:${state.seed}`).slice(0, size);
 }
 
 /** The entry actually shown for a past day, falling back to a fresh draw. */

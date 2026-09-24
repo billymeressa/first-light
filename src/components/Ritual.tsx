@@ -4,10 +4,11 @@ import { THEMES } from '../content/types';
 import type { Settings } from '../state/store';
 import { binaural } from '../audio/binaural';
 import { speak, cancelSpeech } from '../audio/speech';
+import { getRecording, playBlob, stopPlayback, useRecordedIds } from '../audio/recordings';
 import { chime } from '../audio/chime';
 import { BreathCircle } from './BreathCircle';
 
-type Phase = 'settle' | 'affirmation' | 'scene' | 'done';
+type Phase = 'settle' | 'affirmation' | 'done';
 
 interface Props {
   /** One or more affirmations to move through in this sitting. */
@@ -29,30 +30,32 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
   const [entryIndex, setEntryIndex] = useState(0);
   const [repeatIndex, setRepeatIndex] = useState(0);
   const recorded = useRef(false);
+  const recordedIds = useRecordedIds();
 
   const entry = entries[entryIndex];
   const isLastEntry = entryIndex + 1 >= entries.length;
   const repeatTotal = Math.max(1, Math.round(settings.affirmationRepeats));
 
-  // The scene is authored one moment per line but read as a single paragraph.
-  // The seal — the feeling the entry closes on — is folded in as its final
-  // beat, rather than shown as its own screen, so "picture it" always carries
-  // the emotional payoff instead of stopping at the neutral imagery.
-  const sceneText = entry.scene.join(' ');
-  const fullSceneText = `${sceneText} ${entry.seal}`;
-
   /**
-   * Speak a line, then hold it on screen. The hold is measured from when the
-   * line appeared, not from when speech ended, so a slow voice doesn't make
-   * every beat twice as long as the user's chosen pace.
+   * Play a line — your own recorded voice if there is one for this entry,
+   * otherwise synthesized speech — then hold it on screen. The hold is
+   * measured from when the line appeared, not from when audio ended, so a
+   * slow voice doesn't make every beat twice as long as the chosen pace.
    */
   const speakAndHold = useCallback(
-    (text: string, paceMs: number, onDone: () => void) => {
+    (entryToSpeak: Entry, paceMs: number, onDone: () => void) => {
       let cancelled = false;
       let timer: ReturnType<typeof setTimeout>;
       const started = Date.now();
 
-      void speak(text, settings.speech).then(() => {
+      const playback =
+        settings.speech.enabled && recordedIds.has(entryToSpeak.id)
+          ? getRecording(entryToSpeak.id).then((rec) =>
+              rec ? playBlob(rec.blob, settings.speech.volume) : speak(entryToSpeak.affirmation, settings.speech),
+            )
+          : speak(entryToSpeak.affirmation, settings.speech);
+
+      void playback.then(() => {
         if (cancelled) return;
         const remaining = Math.max(paceMs - (Date.now() - started), MIN_HOLD);
         timer = setTimeout(() => {
@@ -64,13 +67,14 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
         cancelled = true;
         clearTimeout(timer);
         cancelSpeech();
+        stopPlayback();
       };
     },
-    [settings.speech],
+    [settings.speech, recordedIds],
   );
 
-  /** Move past the current entry's scene: into the next entry, or done. */
-  const advancePastScene = useCallback(() => {
+  /** Move past the current entry's affirmation: into the next entry, or done. */
+  const advancePastAffirmation = useCallback(() => {
     if (isLastEntry) {
       setPhase('done');
     } else {
@@ -90,25 +94,18 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
     return () => {
       binaural.stop();
       cancelSpeech();
+      stopPlayback();
     };
   }, []);
 
   useEffect(() => {
     if (phase !== 'affirmation') return;
     const hold = settings.speech.enabled ? 4200 : 7500;
-    return speakAndHold(entry.affirmation, hold, () => {
+    return speakAndHold(entry, hold, () => {
       if (repeatIndex + 1 < repeatTotal) setRepeatIndex((i) => i + 1);
-      else setPhase('scene');
+      else advancePastAffirmation();
     });
-  }, [phase, repeatIndex, repeatTotal, entry.affirmation, settings.speech.enabled, speakAndHold]);
-
-  useEffect(() => {
-    if (phase !== 'scene') return;
-    // Paced per line plus one beat for the seal, so a longer scene — and its
-    // closing feeling — both get proportionally more room to land.
-    const hold = settings.scenePace * (entry.scene.length + 1) * 1000;
-    return speakAndHold(fullSceneText, hold, advancePastScene);
-  }, [phase, fullSceneText, entry.scene.length, settings.scenePace, speakAndHold, advancePastScene]);
+  }, [phase, repeatIndex, repeatTotal, entry, settings.speech.enabled, speakAndHold, advancePastAffirmation]);
 
   useEffect(() => {
     if (phase !== 'done' || recorded.current) return;
@@ -120,9 +117,9 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
 
   const advance = () => {
     cancelSpeech();
+    stopPlayback();
     if (phase === 'settle') setPhase('affirmation');
-    else if (phase === 'affirmation') setPhase('scene');
-    else if (phase === 'scene') advancePastScene();
+    else if (phase === 'affirmation') advancePastAffirmation();
   };
 
   const toggleSound = () => {
@@ -141,7 +138,7 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
   return (
     <div className="ritual">
       <div className="ritual-body">
-        {isSession && (phase === 'affirmation' || phase === 'scene') && (
+        {isSession && phase === 'affirmation' && (
           <p className="faint session-tag">
             {setName ?? 'Practice'} · {entryIndex + 1} of {entries.length}
           </p>
@@ -165,15 +162,6 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
                 {repeatIndex + 1} of {repeatTotal}
               </span>
             )}
-          </div>
-        )}
-
-        {phase === 'scene' && (
-          <div className="stack gap-md rise">
-            <span className="eyebrow">Picture it</span>
-            <p className="scene-line" aria-live="polite">
-              {sceneText} <span className="scene-feeling">{entry.seal}</span>
-            </p>
           </div>
         )}
 

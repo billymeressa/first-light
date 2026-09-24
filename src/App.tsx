@@ -2,20 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Entry } from './content/types';
 import { THEMES } from './content/types';
 import { recordCompletion, useStore, type PracticeSet } from './state/store';
-import { entryForDay, resolveEntries } from './state/daily';
+import { defaultSetForDay, resolveEntries } from './state/daily';
 import { computeStreak } from './state/streak';
 import { binaural } from './audio/binaural';
 import { loadVoices } from './audio/speech';
 import { gentleAlarm } from './audio/chime';
 import { dayKey, msUntilNext } from './lib/date';
+import { useCloudSync, useSession } from './state/cloud';
 import { Home } from './components/Home';
 import { Ritual } from './components/Ritual';
 import { Streak } from './components/Streak';
 import { Settings } from './components/Settings';
 import { Library } from './components/Library';
 import { Journal } from './components/Journal';
+import { Account } from './components/Account';
 
-type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library' | 'journal';
+type View = 'home' | 'ritual' | 'streak' | 'settings' | 'library' | 'journal' | 'account';
 
 interface Session {
   entries: Entry[];
@@ -43,15 +45,20 @@ export default function App() {
   const [waking, setWaking] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const stopAlarm = useRef<(() => void) | null>(null);
+  const { session: authSession } = useSession();
+  useCloudSync(state);
 
-  const entry = useMemo(() => entryForDay(state, today), [state, today]);
+  const todaysSet = useMemo(
+    () => defaultSetForDay(state, today, state.settings.defaultSetSize),
+    [state, today],
+  );
   const dates = useMemo(() => state.history.map((h) => h.date), [state.history]);
   const stats = useMemo(() => computeStreak(dates), [dates]);
   const projectedStreak = stats.doneToday
     ? stats.current
     : computeStreak([...dates, today]).current;
 
-  const hue = THEMES.find((t) => t.id === entry.theme)?.hue ?? 28;
+  const hue = THEMES.find((t) => t.id === todaysSet[0]?.theme)?.hue ?? 28;
 
   // ── Wake alarm ────────────────────────────────────────────────────────
   const { alarmEnabled, alarmTime } = state.settings;
@@ -100,7 +107,7 @@ export default function App() {
     setView('ritual');
   };
 
-  const beginRitual = () => startSession({ entries: [entry] });
+  const beginRitual = () => startSession({ entries: todaysSet });
 
   const beginSet = (set: PracticeSet) => {
     const resolved = resolveEntries(state, set.entryIds);
@@ -119,6 +126,7 @@ export default function App() {
     { id: 'library', label: 'Library' },
     { id: 'journal', label: 'Journal' },
     { id: 'settings', label: 'Settings' },
+    { id: 'account', label: authSession ? 'Account' : 'Sign in' },
   ];
 
   return (
@@ -170,7 +178,7 @@ export default function App() {
 
         {view === 'home' && (
           <Home
-            entry={entry}
+            entries={todaysSet}
             stats={stats}
             alarmTime={alarmEnabled ? alarmTime : null}
             sets={state.sets}
@@ -198,6 +206,7 @@ export default function App() {
         {view === 'library' && <Library />}
         {view === 'journal' && <Journal />}
         {view === 'settings' && <Settings />}
+        {view === 'account' && <Account />}
       </div>
     </div>
   );

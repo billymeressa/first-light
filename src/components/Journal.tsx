@@ -8,7 +8,8 @@ import {
   recordReflection,
   useStore,
 } from '../state/store';
-import { describeGenerationError, generateFromJournal, type GeneratedEntry } from '../ai/anthropic';
+import { generateFromJournal, type GeneratedEntry } from '../ai/reflect';
+import { useSession } from '../state/cloud';
 
 type Tab = 'entries' | 'portrait';
 
@@ -22,11 +23,17 @@ function toSuggestion(e: GeneratedEntry): Suggestion {
 
 export function Journal() {
   const state = useStore();
+  const { session } = useSession();
   const [tab, setTab] = useState<Tab>('entries');
   const [draft, setDraft] = useState('');
 
   const [reflectingId, setReflectingId] = useState<string | null>(null);
-  const [reflectError, setReflectError] = useState<string | null>(null);
+  // Keyed to the entry it came from, and rendered inline on that entry's
+  // card — a message floating above the compose box is easy to miss if
+  // you're looking at an entry further down the list when it resolves.
+  const [reflectError, setReflectError] = useState<{ entryId: string; message: string } | null>(
+    null,
+  );
 
   const [reviewJournalId, setReviewJournalId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -42,23 +49,23 @@ export function Journal() {
   };
 
   const reflect = async (journalId: string, text: string) => {
-    if (!state.apiKey) {
-      setReflectError('Add an API key in Settings → AI generation before reflecting.');
+    if (!session) {
+      setReflectError({ entryId: journalId, message: 'Sign in (Account, in the nav) to use Journal reflection.' });
       return;
     }
+
     setReflectError(null);
     setReflectingId(journalId);
     try {
-      const result = await generateFromJournal({
-        journalText: text,
-        currentPortrait,
-        apiKey: state.apiKey,
-      });
+      const result = await generateFromJournal(text, currentPortrait);
       setSuggestions(result.entries.map(toSuggestion));
       setPortraitDraft(result.portrait);
       setReviewJournalId(journalId);
     } catch (err) {
-      setReflectError(describeGenerationError(err));
+      setReflectError({
+        entryId: journalId,
+        message: err instanceof Error ? err.message : 'Reflection failed.',
+      });
     } finally {
       setReflectingId(null);
     }
@@ -73,14 +80,12 @@ export function Journal() {
     const newIds: string[] = [];
     for (const s of suggestions) {
       if (!s.keep) continue;
-      if (!s.affirmation.trim() || s.scene.every((l) => !l.trim())) continue;
+      if (!s.affirmation.trim()) continue;
       const id = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       addCustomEntry({
         id,
         theme: s.theme,
         affirmation: s.affirmation.trim(),
-        scene: s.scene.map((l) => l.trim()).filter(Boolean),
-        seal: s.seal.trim() || 'The feeling of this already being true.',
         custom: true,
         source: 'journal',
       });
@@ -147,27 +152,9 @@ export function Journal() {
               <label>
                 Affirmation
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={s.affirmation}
                   onChange={(e) => updateSuggestion(i, { affirmation: e.target.value })}
-                />
-              </label>
-
-              <label>
-                Scene — one moment per line
-                <textarea
-                  rows={5}
-                  value={s.scene.join('\n')}
-                  onChange={(e) => updateSuggestion(i, { scene: e.target.value.split('\n') })}
-                />
-              </label>
-
-              <label>
-                The feeling to close on
-                <textarea
-                  rows={2}
-                  value={s.seal}
-                  onChange={(e) => updateSuggestion(i, { seal: e.target.value })}
                 />
               </label>
             </div>
@@ -217,6 +204,12 @@ export function Journal() {
 
       {tab === 'entries' ? (
         <>
+          {!session && (
+            <p className="note" style={{ marginBottom: '1.25rem' }}>
+              Reflect uses this app's built-in AI, which is why it's tied to an account — sign
+              in from <b>Account</b> in the nav to use it. Writing entries works either way.
+            </p>
+          )}
           <div className="editor" style={{ paddingTop: 0 }}>
             <label>
               What's on your mind
@@ -231,12 +224,6 @@ export function Journal() {
               Save entry
             </button>
           </div>
-
-          {reflectError && (
-            <p className="note" style={{ margin: '1.25rem 0' }}>
-              {reflectError}
-            </p>
-          )}
 
           {journal.length === 0 ? (
             <p className="faint" style={{ fontSize: '0.85rem', marginTop: '1.5rem' }}>
@@ -270,6 +257,11 @@ export function Journal() {
                       </button>
                     </div>
                   </div>
+                  {reflectError?.entryId === entry.id && (
+                    <p className="note" style={{ marginTop: '0.75rem' }}>
+                      {reflectError.message}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -278,7 +270,7 @@ export function Journal() {
       ) : (
         <>
           {currentPortrait ? (
-            <p className="scene-line rise" style={{ marginBottom: '2rem', whiteSpace: 'pre-wrap' }}>
+            <p className="prose rise" style={{ marginBottom: '2rem', whiteSpace: 'pre-wrap' }}>
               {currentPortrait}
             </p>
           ) : (

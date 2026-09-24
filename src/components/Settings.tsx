@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
-import { patchSettings, resetAll, setApiKey, useStore } from '../state/store';
+import { patchSettings, resetAll, useStore } from '../state/store';
+import { cloudSupported, useSession } from '../state/cloud';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
   loadVoices,
@@ -85,6 +86,7 @@ function Slider({
 
 export function Settings() {
   const state = useStore();
+  const { session } = useSession();
   const s = state.settings;
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewing, setPreviewing] = useState(false);
@@ -153,6 +155,18 @@ export function Settings() {
           </div>
         </div>
 
+        <Row label="Daily set size" hint="How many affirmations make up today's practice.">
+          <Slider
+            label="Daily set size"
+            value={s.defaultSetSize}
+            min={2}
+            max={6}
+            step={1}
+            onChange={(v) => patchSettings({ defaultSetSize: v })}
+            format={(v) => `${v}`}
+          />
+        </Row>
+
         <Row label="Settling breaths" hint="Slow breaths before the affirmation. Zero skips it.">
           <Slider
             label="Settling breaths"
@@ -165,7 +179,7 @@ export function Settings() {
           />
         </Row>
 
-        <Row label="Repeat the affirmation" hint="How many times the line is said before the scene.">
+        <Row label="Repeat the affirmation" hint="How many times the line is said.">
           <Slider
             label="Repeat the affirmation"
             value={s.affirmationRepeats}
@@ -174,18 +188,6 @@ export function Settings() {
             step={1}
             onChange={(v) => patchSettings({ affirmationRepeats: v })}
             format={(v) => (v === 1 ? 'once' : `${v}×`)}
-          />
-        </Row>
-
-        <Row label="Scene pace" hint="Time per line of the scene. A longer scene dwells longer.">
-          <Slider
-            label="Scene pace"
-            value={s.scenePace}
-            min={5}
-            max={30}
-            step={1}
-            onChange={(v) => patchSettings({ scenePace: v })}
-            format={(v) => `${v}s`}
           />
         </Row>
       </section>
@@ -197,7 +199,10 @@ export function Settings() {
             This browser doesn't offer speech synthesis, so read-aloud is unavailable.
           </p>
         )}
-        <Row label="Speak the affirmation" hint="Uses your device's built-in voice. Nothing is sent anywhere.">
+        <Row
+          label="Speak the affirmation"
+          hint="Plays your recorded voice where you've added one (Library → Voice), otherwise your device's built-in voice. Nothing is sent anywhere."
+        >
           <Switch
             label="Speak the affirmation"
             checked={s.speech.enabled && speechSupported}
@@ -380,33 +385,34 @@ export function Settings() {
 
       <section className="section">
         <h2>AI generation</h2>
-        <p className="note" style={{ marginBottom: '1.25rem' }}>
-          Journal → Reflect calls the Claude API directly from this browser, using your own
-          API key — there's no server in between. The journal entry you're reflecting on is
-          sent to Anthropic each time you do this; nothing else in the app is. The key itself
-          is stored in this browser's local storage, unencrypted, the same as everything else
-          the app remembers. Treat it like a password: anyone with access to this browser could
-          read it from developer tools.
+        <p className="note">
+          Journal → Reflect uses this app's own Claude/Gemini access — there's no key for you to
+          manage. Since every reflection costs the app something, it only works when you're
+          signed in: see <b>Account</b> in the nav.
         </p>
-        <Row label="Anthropic API key">
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            aria-label="Anthropic API key"
-            placeholder="sk-ant-…"
-            value={state.apiKey ?? ''}
-            onChange={(e) => setApiKey(e.target.value.trim() || null)}
-            style={{ width: '14rem' }}
-          />
-        </Row>
       </section>
 
       <section className="section">
         <h2>Your data</h2>
         <p className="note" style={{ marginBottom: '1.25rem' }}>
-          Everything — your streak, your settings, anything you've written — lives in this
-          browser only. There's no account and no server. Clearing site data erases it.
+          {session ? (
+            <>
+              Signed in as <b>{session.user.email}</b> — your streak, settings, and everything
+              you've written sync to your account. Manage sign-in from <b>Account</b> in the
+              nav.
+            </>
+          ) : cloudSupported ? (
+            <>
+              Everything currently lives in this browser only — sign in from{' '}
+              <b>{'Account'}</b> in the nav to sync your streak, settings, and everything
+              you've written across devices. Clearing site data erases anything not synced.
+            </>
+          ) : (
+            <>
+              Everything — your streak, your settings, anything you've written — lives in this
+              browser only. There's no account and no server. Clearing site data erases it.
+            </>
+          )}
         </p>
         {confirmReset ? (
           <div className="row-control">
