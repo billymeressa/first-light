@@ -5,6 +5,7 @@ import type { Settings } from '../state/store';
 import { binaural } from '../audio/binaural';
 import { speak, cancelSpeech } from '../audio/speech';
 import { getRecording, playBlob, stopPlayback, useRecordedIds } from '../audio/recordings';
+import { getPicture, usePictureIds } from '../state/pictures';
 import { chime } from '../audio/chime';
 import { BreathCircle } from './BreathCircle';
 
@@ -31,6 +32,8 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
   const [repeatIndex, setRepeatIndex] = useState(0);
   const recorded = useRef(false);
   const recordedIds = useRecordedIds();
+  const pictureIds = usePictureIds();
+  const [pictureUrl, setPictureUrl] = useState<string | null>(null);
 
   const entry = entries[entryIndex];
   const isLastEntry = entryIndex + 1 >= entries.length;
@@ -83,6 +86,26 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
       setPhase('affirmation');
     }
   }, [isLastEntry]);
+
+  // Load the current entry's picture, if it has one. Re-runs per entry, not
+  // per repeat, since the photo doesn't change across repeats of the same line.
+  useEffect(() => {
+    if (!pictureIds.has(entry.id)) {
+      setPictureUrl(null);
+      return;
+    }
+    let url: string | null = null;
+    let cancelled = false;
+    void getPicture(entry.id).then((pic) => {
+      if (cancelled || !pic) return;
+      url = URL.createObjectURL(pic.blob);
+      setPictureUrl(url);
+    });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [entry.id, pictureIds]);
 
   // Keep the running tone in sync with live settings changes.
   useEffect(() => {
@@ -138,6 +161,10 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
   return (
     <div className="ritual">
       <div className="ritual-body">
+        {phase === 'affirmation' && pictureUrl && (
+          <div className="ritual-picture" style={{ backgroundImage: `url(${pictureUrl})` }} />
+        )}
+
         {isSession && phase === 'affirmation' && (
           <p className="faint session-tag">
             {setName ?? 'Practice'} · {entryIndex + 1} of {entries.length}

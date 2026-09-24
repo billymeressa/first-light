@@ -195,13 +195,15 @@ select {
 }
 
 .reduce-motion .rise,
-.reduce-motion .soften {
+.reduce-motion .soften,
+.reduce-motion .ritual-picture {
   animation-duration: 0.25s;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .soften {
+  .soften,
+  .ritual-picture {
     animation-duration: 0.25s;
   }
 }
@@ -373,12 +375,45 @@ select {
 }
 
 .ritual-body {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 1.75rem;
   padding: 1.5rem 0;
+}
+
+.ritual-body > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ritual-picture {
+  position: absolute;
+  inset: -1.5rem -1.25rem;
+  background-size: cover;
+  background-position: center;
+  border-radius: 1rem;
+  opacity: 0;
+  animation: picture-in 1.2s var(--ease) forwards;
+}
+
+.ritual-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--hue) 30% 4% / 0.55) 0%,
+    hsl(var(--hue) 30% 4% / 0.72) 60%,
+    hsl(var(--hue) 30% 4% / 0.88) 100%
+  );
+}
+
+@keyframes picture-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .ritual-foot {
@@ -786,6 +821,15 @@ button:focus-visible {
 @keyframes rec-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+.picture-preview {
+  width: 100%;
+  max-width: 16rem;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line);
 }
 
 /* ── Wake overlay ────────────────────────────────────────────────────── */

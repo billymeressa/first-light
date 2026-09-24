@@ -14,6 +14,7 @@ import {
 } from '../state/store';
 import { allEntries } from '../state/daily';
 import { VoiceRecorder } from './VoiceRecorder';
+import { PictureUploader } from './PictureUploader';
 
 const BLANK = {
   theme: 'confidence' as Theme,
@@ -33,6 +34,7 @@ export function Library() {
   const [draft, setDraft] = useState({ ...BLANK });
   const [filter, setFilter] = useState<Theme | 'all'>('all');
   const [voiceOpenId, setVoiceOpenId] = useState<string | null>(null);
+  const [pictureOpenId, setPictureOpenId] = useState<string | null>(null);
 
   // Set editor
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -372,6 +374,13 @@ export function Library() {
                     >
                       Voice
                     </button>
+                    <button
+                      className="btn-quiet"
+                      aria-pressed={pictureOpenId === entry.id}
+                      onClick={() => setPictureOpenId((id) => (id === entry.id ? null : entry.id))}
+                    >
+                      Picture
+                    </button>
                     <button className="btn-quiet" onClick={() => toggleHidden(entry.id)}>
                       {isHidden ? 'Restore' : 'Retire'}
                     </button>
@@ -380,6 +389,11 @@ export function Library() {
                 {voiceOpenId === entry.id && (
                   <div style={{ marginTop: '0.75rem' }}>
                     <VoiceRecorder entryId={entry.id} />
+                  </div>
+                )}
+                {pictureOpenId === entry.id && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <PictureUploader entryId={entry.id} />
                   </div>
                 )}
               </div>
