@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ReflectError, handleReflect } from './_lib/reflect';
+import { ReflectError, handleReflect } from './_lib/reflect.js';
 
 /**
  * Vercel deploys everything under /api as a serverless function automatically

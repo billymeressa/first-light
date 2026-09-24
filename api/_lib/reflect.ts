@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
-import { SYSTEM_PROMPT, THEME_IDS, buildUserContent, type ReflectionResult } from '../../src/ai/prompt';
+import { SYSTEM_PROMPT, THEME_IDS, buildUserContent, type ReflectionResult } from '../../src/ai/prompt.js';
 
 /**
  * The server-side half of Journal reflection. Runs as a Vercel serverless
