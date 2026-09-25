@@ -102,6 +102,26 @@ export function Journal() {
           Review
         </h1>
 
+        <div className="row-control sticky-actions" style={{ justifyContent: 'flex-start' }}>
+          <button
+            className="btn btn-primary"
+            onClick={saveReflection}
+            disabled={!portraitDraft.trim()}
+          >
+            Save {keptCount > 0 ? `(${keptCount} affirmation${keptCount === 1 ? '' : 's'})` : ''}
+          </button>
+          <button
+            className="btn-quiet"
+            onClick={() => {
+              setReviewJournalId(null);
+              setSuggestions([]);
+              setPortraitDraft('');
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+
         {sourceEntry && (
           <p className="faint" style={{ fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
             From: "{sourceEntry.text.slice(0, 140)}
@@ -152,26 +172,6 @@ export function Journal() {
               </label>
             </div>
           ))}
-        </div>
-
-        <div className="row-control" style={{ justifyContent: 'flex-start' }}>
-          <button
-            className="btn btn-primary"
-            onClick={saveReflection}
-            disabled={!portraitDraft.trim()}
-          >
-            Save {keptCount > 0 ? `(${keptCount} affirmation${keptCount === 1 ? '' : 's'})` : ''}
-          </button>
-          <button
-            className="btn-quiet"
-            onClick={() => {
-              setReviewJournalId(null);
-              setSuggestions([]);
-              setPortraitDraft('');
-            }}
-          >
-            Cancel
-          </button>
         </div>
       </div>
     );

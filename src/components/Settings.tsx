@@ -193,7 +193,10 @@ export function Settings({ onOpenAccount }: SettingsProps) {
           />
         </Row>
 
-        <Row label="Repeat the affirmation" hint="How many times the line is said.">
+        <Row
+          label="Repeat the affirmation"
+          hint="The line is said once, then held silently this many times so you can say it back yourself."
+        >
           <Slider
             label="Repeat the affirmation"
             value={s.affirmationRepeats}

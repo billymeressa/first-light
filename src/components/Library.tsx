@@ -124,6 +124,26 @@ export function Library() {
           {editingId === 'new' ? 'Write your own' : 'Edit'}
         </h1>
 
+        <div className="row-control sticky-actions" style={{ justifyContent: 'flex-start' }}>
+          <button className="btn btn-primary" onClick={save} disabled={!canSave}>
+            Save
+          </button>
+          <button className="btn-quiet" onClick={() => setEditingId(null)}>
+            Cancel
+          </button>
+          {editingId !== 'new' && (
+            <button
+              className="btn-quiet"
+              onClick={() => {
+                deleteCustomEntry(editingId);
+                setEditingId(null);
+              }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+
         <div className="editor">
           <label>
             Theme
@@ -148,26 +168,6 @@ export function Library() {
               onChange={(e) => setDraft({ ...draft, affirmation: e.target.value })}
             />
           </label>
-
-          <div className="row-control" style={{ justifyContent: 'flex-start' }}>
-            <button className="btn btn-primary" onClick={save} disabled={!canSave}>
-              Save
-            </button>
-            <button className="btn-quiet" onClick={() => setEditingId(null)}>
-              Cancel
-            </button>
-            {editingId !== 'new' && (
-              <button
-                className="btn-quiet"
-                onClick={() => {
-                  deleteCustomEntry(editingId);
-                  setEditingId(null);
-                }}
-              >
-                Delete
-              </button>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -186,6 +186,26 @@ export function Library() {
         <h1 className="affirmation" style={{ fontSize: '1.5rem' }}>
           {editingSetId === 'new' ? 'New set' : 'Edit set'}
         </h1>
+
+        <div className="row-control sticky-actions" style={{ justifyContent: 'flex-start' }}>
+          <button className="btn btn-primary" onClick={saveSet} disabled={!setDraftName.trim()}>
+            Save
+          </button>
+          <button className="btn-quiet" onClick={() => setEditingSetId(null)}>
+            Cancel
+          </button>
+          {editingSetId !== 'new' && (
+            <button
+              className="btn-quiet"
+              onClick={() => {
+                deleteSet(editingSetId);
+                setEditingSetId(null);
+              }}
+            >
+              Delete set
+            </button>
+          )}
+        </div>
 
         <div className="editor">
           <label>
@@ -270,26 +290,6 @@ export function Library() {
                 </div>
               </div>
             ))}
-          </div>
-
-          <div className="row-control" style={{ justifyContent: 'flex-start' }}>
-            <button className="btn btn-primary" onClick={saveSet} disabled={!setDraftName.trim()}>
-              Save
-            </button>
-            <button className="btn-quiet" onClick={() => setEditingSetId(null)}>
-              Cancel
-            </button>
-            {editingSetId !== 'new' && (
-              <button
-                className="btn-quiet"
-                onClick={() => {
-                  deleteSet(editingSetId);
-                  setEditingSetId(null);
-                }}
-              >
-                Delete set
-              </button>
-            )}
           </div>
         </div>
       </div>

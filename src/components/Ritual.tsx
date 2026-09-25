@@ -25,6 +25,10 @@ interface Props {
 /** Minimum beat a line is held for, even if speech ran long. */
 const MIN_HOLD = 2200;
 
+/** Silent hold for a repeat beat — the line was already said once; this is
+ * just space for the user to say it back themselves, not another readout. */
+const SILENT_REPEAT_HOLD = 6500;
+
 export function Ritual({ entries, setName, settings, streakAfter, onFinish, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>(settings.settleBreaths > 0 ? 'settle' : 'affirmation');
   const [soundOn, setSoundOn] = useState(settings.binauralEnabled);
@@ -123,11 +127,22 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
 
   useEffect(() => {
     if (phase !== 'affirmation') return;
-    const hold = settings.speech.enabled ? 4200 : 7500;
-    return speakAndHold(entry, hold, () => {
+
+    const next = () => {
       if (repeatIndex + 1 < repeatTotal) setRepeatIndex((i) => i + 1);
       else advancePastAffirmation();
-    });
+    };
+
+    // Only the first beat is actually said — the line doesn't need repeating
+    // by the app itself. Every beat after that is a silent, wider gap: room
+    // for the user to say it back, not another readout talking over them.
+    if (repeatIndex === 0) {
+      const hold = settings.speech.enabled ? 4200 : 7500;
+      return speakAndHold(entry, hold, next);
+    }
+
+    const timer = setTimeout(next, SILENT_REPEAT_HOLD);
+    return () => clearTimeout(timer);
   }, [phase, repeatIndex, repeatTotal, entry, settings.speech.enabled, speakAndHold, advancePastAffirmation]);
 
   useEffect(() => {

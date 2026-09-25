@@ -982,6 +982,19 @@ button:focus-visible {
   padding: 1.25rem 0;
 }
 
+/* Primary actions (Save/Cancel/Delete) for a form that can scroll well past
+   one screen — e.g. the set editor's full library picker below it. Placed
+   right under the title and stuck there on scroll, so "Save" is never
+   something you have to go hunting for at the bottom of a long list. */
+.sticky-actions {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 0.85rem 0;
+  margin-bottom: 0.25rem;
+  background: linear-gradient(to bottom, var(--bg) 82%, transparent);
+}
+
 .editor label {
   display: flex;
   flex-direction: column;
