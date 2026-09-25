@@ -25,9 +25,17 @@ interface Props {
 /** Minimum beat a line is held for, even if speech ran long. */
 const MIN_HOLD = 2200;
 
-/** Silent hold for a repeat beat — the line was already said once; this is
- * just space for the user to say it back themselves, not another readout. */
+/** Silent hold for a repeat beat — space for the user to say it back
+ * themselves, not another readout. Wider than a spoken beat on purpose. */
 const SILENT_REPEAT_HOLD = 6500;
+
+/** How many beats the app actually reads aloud before going quiet — "a few,"
+ * then the rest of the configured repeats are silent, cued the same way. */
+const SPOKEN_REPEATS = 2;
+
+/** Gap after the cue chime before the beat itself starts, so the two don't
+ * overlap — long enough to register as a distinct "go" signal. */
+const CUE_GAP = 650;
 
 export function Ritual({ entries, setName, settings, streakAfter, onFinish, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>(settings.settleBreaths > 0 ? 'settle' : 'affirmation');
@@ -125,6 +133,8 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
     };
   }, []);
 
+  const spokenRepeats = Math.min(SPOKEN_REPEATS, repeatTotal);
+
   useEffect(() => {
     if (phase !== 'affirmation') return;
 
@@ -133,17 +143,32 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
       else advancePastAffirmation();
     };
 
-    // Only the first beat is actually said — the line doesn't need repeating
-    // by the app itself. Every beat after that is a silent, wider gap: room
-    // for the user to say it back, not another readout talking over them.
-    if (repeatIndex === 0) {
-      const hold = settings.speech.enabled ? 4200 : 7500;
-      return speakAndHold(entry, hold, next);
-    }
+    // A cue marks the start of every beat — spoken or silent — so the
+    // rhythm stays consistent even once the app stops reading the line.
+    void chime({ freq: 660, gain: 0.12, decay: 0.9, reverb: 0.25 });
 
-    const timer = setTimeout(next, SILENT_REPEAT_HOLD);
-    return () => clearTimeout(timer);
-  }, [phase, repeatIndex, repeatTotal, entry, settings.speech.enabled, speakAndHold, advancePastAffirmation]);
+    let cancelled = false;
+    let stopBeat: (() => void) | undefined;
+
+    const cueTimer = setTimeout(() => {
+      if (cancelled) return;
+      // The app reads the line aloud for the first couple of beats, then
+      // goes quiet for the rest — room for the user to say it back
+      // themselves, cued the same way, without the app talking over them.
+      if (settings.speech.enabled && repeatIndex < spokenRepeats) {
+        stopBeat = speakAndHold(entry, 4200, next);
+      } else {
+        const holdTimer = setTimeout(next, SILENT_REPEAT_HOLD);
+        stopBeat = () => clearTimeout(holdTimer);
+      }
+    }, CUE_GAP);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(cueTimer);
+      stopBeat?.();
+    };
+  }, [phase, repeatIndex, repeatTotal, spokenRepeats, entry, settings.speech.enabled, speakAndHold, advancePastAffirmation]);
 
   useEffect(() => {
     if (phase !== 'done' || recorded.current) return;
@@ -202,6 +227,8 @@ export function Ritual({ entries, setName, settings, streakAfter, onFinish, onEx
             {repeatTotal > 1 && (
               <span className="faint" style={{ fontSize: '0.78rem', letterSpacing: '0.06em' }}>
                 {repeatIndex + 1} of {repeatTotal}
+                {settings.speech.enabled &&
+                  (repeatIndex < spokenRepeats ? ' · aloud' : ' · your turn')}
               </span>
             )}
           </div>

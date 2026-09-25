@@ -195,7 +195,7 @@ export function Settings({ onOpenAccount }: SettingsProps) {
 
         <Row
           label="Repeat the affirmation"
-          hint="The line is said once, then held silently this many times so you can say it back yourself."
+          hint="A cue sound marks each beat. The line is read aloud for the first couple, then held silently for the rest so you can say it back yourself."
         >
           <Slider
             label="Repeat the affirmation"

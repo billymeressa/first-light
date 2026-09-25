@@ -14,7 +14,8 @@ export interface Settings {
   /** How many affirmations make up today's default practice set. */
   defaultSetSize: number;
   settleBreaths: number;
-  /** How many times each affirmation is said before moving on. */
+  /** How many times through each affirmation before moving on — the first
+   * couple are read aloud, the rest held silently for the user to say back. */
   affirmationRepeats: number;
   alarmEnabled: boolean;
   /** Local "HH:MM". */
@@ -76,7 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   themeFocus: 'all',
   defaultSetSize: 3,
   settleBreaths: 4,
-  affirmationRepeats: 2,
+  affirmationRepeats: 4,
   alarmEnabled: false,
   alarmTime: '06:30',
   reduceMotion: false,
