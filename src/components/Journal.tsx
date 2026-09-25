@@ -9,7 +9,6 @@ import {
   useStore,
 } from '../state/store';
 import { generateFromJournal, type GeneratedEntry } from '../ai/reflect';
-import { useSession } from '../state/cloud';
 
 type Tab = 'entries' | 'portrait';
 
@@ -23,7 +22,6 @@ function toSuggestion(e: GeneratedEntry): Suggestion {
 
 export function Journal() {
   const state = useStore();
-  const { session } = useSession();
   const [tab, setTab] = useState<Tab>('entries');
   const [draft, setDraft] = useState('');
 
@@ -49,14 +47,6 @@ export function Journal() {
   };
 
   const reflect = async (journalId: string, text: string) => {
-    if (!session) {
-      setReflectError({
-        entryId: journalId,
-        message: 'Sign in from Settings → Account to use Journal reflection.',
-      });
-      return;
-    }
-
     setReflectError(null);
     setReflectingId(journalId);
     try {
@@ -201,12 +191,6 @@ export function Journal() {
 
       {tab === 'entries' ? (
         <>
-          {!session && (
-            <p className="note" style={{ marginBottom: '1.25rem' }}>
-              Reflect uses this app's built-in AI, which is why it's tied to an account — sign
-              in from <b>Settings → Account</b> to use it. Writing entries works either way.
-            </p>
-          )}
           <div className="editor" style={{ paddingTop: 0 }}>
             <label>
               What's on your mind

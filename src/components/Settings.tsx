@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEMES, type Theme } from '../content/types';
 import { patchSettings, resetAll, useStore } from '../state/store';
-import { cloudSupported, useSession } from '../state/cloud';
+import { useSession } from '../state/cloud';
 import { IconAccount, IconChevron } from './Icons';
 import { binaural, THETA_RANGE, type BinauralSettings } from '../audio/binaural';
 import {
@@ -129,20 +129,18 @@ export function Settings({ onOpenAccount }: SettingsProps) {
 
   return (
     <div className="rise">
-      {cloudSupported && (
-        <button className="account-row" onClick={onOpenAccount}>
-          <span className="account-avatar">
-            <IconAccount />
-          </span>
-          <span className="account-text">
-            <b>{session ? (session.user.email ?? 'Your account') : 'Sign in'}</b>
-            <small>{session ? 'Synced across your devices' : 'Sync your practice + use Reflect'}</small>
-          </span>
-          <span className="faint">
-            <IconChevron />
-          </span>
-        </button>
-      )}
+      <button className="account-row" onClick={onOpenAccount}>
+        <span className="account-avatar">
+          <IconAccount />
+        </span>
+        <span className="account-text">
+          <b>{session?.user.email ?? 'Your account'}</b>
+          <small>Synced across your devices</small>
+        </span>
+        <span className="faint">
+          <IconChevron />
+        </span>
+      </button>
 
       <section className="section">
         <h2>Practice</h2>
@@ -411,24 +409,9 @@ export function Settings({ onOpenAccount }: SettingsProps) {
       <section className="section">
         <h2>Your data</h2>
         <p className="note" style={{ marginBottom: '1.25rem' }}>
-          {session ? (
-            <>
-              Signed in as <b>{session.user.email}</b> — your streak, settings, and everything
-              you've written sync to your account. Manage sign-in from the account row at the
-              top of this screen.
-            </>
-          ) : cloudSupported ? (
-            <>
-              Everything currently lives in this browser only — sign in from the account row at
-              the top of this screen to sync your streak, settings, and everything you've
-              written across devices. Clearing site data erases anything not synced.
-            </>
-          ) : (
-            <>
-              Everything — your streak, your settings, anything you've written — lives in this
-              browser only. There's no account and no server. Clearing site data erases it.
-            </>
-          )}
+          Signed in as <b>{session?.user.email}</b> — your streak, settings, and everything
+          you've written sync to your account. Manage sign-in from the account row at the top
+          of this screen.
         </p>
         {confirmReset ? (
           <div className="row-control">

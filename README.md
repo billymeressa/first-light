@@ -32,11 +32,10 @@ how it's changed. Nothing about this is automatic — reflection only runs when 
 and only while signed in (see below — every reflection costs the app owner money,
 so it's tied to a real account rather than open to anyone).
 
-Everything else works local-only by default — your streak, settings, and
-anything you write live in this browser's `localStorage`, no account
-required. **Account → Sign in** adds optional cloud sync (Supabase): create an
-account and the same data follows you to any device you sign into. Skip it
-and the app behaves exactly as before, minus Journal reflection.
+An account is required to use the app at all — sign in or create one on
+first launch, before anything else is reachable. Your streak, settings, and
+anything you write sync (via Supabase) to that account and follow you to any
+device you sign into.
 
 ## Architecture
 
@@ -111,11 +110,12 @@ can't be hit anonymously and run up an unbounded bill. Only the journal entry
 being reflected on is sent, and only when you tap Reflect — nothing runs
 automatically, and nothing else in the app makes a network call.
 
-## Cloud sync + Journal reflection (optional)
+## Cloud sync + Journal reflection
 
-Both features share one piece of setup — Supabase accounts — and Journal reflection needs one
-more step on top (a Claude and/or Gemini key, held server-side). Off by default; the app runs
-fully local-only with zero setup otherwise.
+Both features share one piece of setup — Supabase accounts, which are **required** to run this
+app at all, not optional — and Journal reflection needs one more step on top (a Claude and/or
+Gemini key, held server-side). Without the steps below configured, the app has nothing to show
+beyond the sign-in screen.
 
 **Accounts + sync:**
 
@@ -135,7 +135,7 @@ fully local-only with zero setup otherwise.
 5. Restart `npm run dev` (or add the same two variables to your Vercel project's Environment
    Variables and redeploy, for the live site).
 
-Once configured, **Account → Sign in** appears in the nav. Email/password only, no magic links
+Once configured, the sign-in screen appears on launch. Email/password only, no magic links
 or OAuth — signing up sends a confirmation email via Supabase's default mailer. Everything in
 `AppState` syncs: settings, the affirmation library (custom + retired), sets, practice history,
 journal entries, and the portrait history. Recorded voice takes don't (`src/audio/recordings.ts`
@@ -173,5 +173,4 @@ Reflection is gated on being signed in — see the design note above for why.
   being signed in (see Cloud sync above).
 - **Library → Voice** records your own voice for any affirmation — it plays back during
   practice instead of the synthesized voice, if "Speak the affirmation" is on.
-- **Account → Sign in** (if cloud sync is configured — see above) syncs your data across
-  devices; otherwise everything just stays in this browser.
+- **Settings → account row** shows who you're signed in as and lets you sign out.

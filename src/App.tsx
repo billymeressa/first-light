@@ -8,7 +8,7 @@ import { binaural } from './audio/binaural';
 import { loadVoices } from './audio/speech';
 import { gentleAlarm } from './audio/chime';
 import { dayKey, msUntilNext } from './lib/date';
-import { useCloudSync } from './state/cloud';
+import { useCloudSync, useSession } from './state/cloud';
 import { Home } from './components/Home';
 import { Ritual } from './components/Ritual';
 import { Streak } from './components/Streak';
@@ -56,6 +56,7 @@ export default function App() {
   const [waking, setWaking] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const stopAlarm = useRef<(() => void) | null>(null);
+  const { session: authSession, loaded: authLoaded } = useSession();
   useCloudSync(state);
 
   const todaysSet = useMemo(
@@ -129,6 +130,36 @@ export default function App() {
     silenceAlarm();
     beginRitual();
   };
+
+  // ── Auth gate ────────────────────────────────────────────────────────
+  // Nothing below this point is reachable signed out — no local-only or
+  // guest mode. Every reflection call costs the app owner money, and
+  // syncing is the whole point of having accounts at all, so there's no
+  // reduced "just let me practice" path left half-working without one.
+  if (!authLoaded) {
+    return (
+      <div className="app">
+        <div className="aurora" />
+        <div className="screen center-col">
+          <span className="faint">Loading…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authSession) {
+    return (
+      <div className="app">
+        <div className="aurora" />
+        <div className="screen">
+          <header className="topbar">
+            <span className="eyebrow wordmark">First Light</span>
+          </header>
+          <Account />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

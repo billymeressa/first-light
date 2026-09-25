@@ -19,8 +19,8 @@ export function Account() {
           Account
         </h1>
         <p className="note">
-          Cloud sync isn't configured for this deployment, so everything stays local to this
-          browser. See <code>README.md</code> for how to turn it on.
+          Cloud sync isn't configured for this deployment, and an account is required to use
+          the app at all. See <code>README.md</code> for how to turn it on.
         </p>
       </div>
     );
@@ -99,8 +99,8 @@ export function Account() {
         {mode === 'signin' ? 'Sign in' : 'Create an account'}
       </h1>
       <p className="faint" style={{ fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-        Optional — the app works fine in just this browser without one. An account syncs your
-        streak, settings, and everything you've written across devices.
+        Your streak, settings, and everything you write sync to your account and follow you to
+        any device you sign into.
       </p>
 
       <form className="editor" onSubmit={(e) => void submit(e)}>
