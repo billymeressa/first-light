@@ -1020,6 +1020,18 @@ button:focus-visible {
   50% { opacity: 0.35; }
 }
 
+/* A phrase quoted back from the user's own entry, as evidence for what a lens
+   noticed. Indented and serif so it reads as their words, not the app's. */
+.quote-line {
+  font-family: var(--serif);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--accent-dim);
+  margin-bottom: 0.6rem;
+}
+
 .picture-preview {
   width: 100%;
   max-width: 16rem;

@@ -43,9 +43,9 @@ export interface JournalEntry {
   /** ISO datetime of when the entry was written. */
   createdAt: string;
   text: string;
-  /** Set once a reflection has run on this entry. */
-  reflectedAt?: string;
-  /** The custom entries this reflection generated and the user kept. */
+  /** Set once this entry has been read through a lens. */
+  analyzedAt?: string;
+  /** The custom library entries this entry ultimately produced and the user kept. */
   generatedEntryIds?: string[];
 }
 
@@ -53,6 +53,50 @@ export interface PortraitVersion {
   text: string;
   /** ISO datetime this version was written. */
   date: string;
+}
+
+/** What a lens noticed in one journal entry — step 2 of the pipeline. Kept
+ * whether or not it produced an affirmation, so a rejected suggestion can
+ * still be traced back to what prompted it. */
+export interface Analysis {
+  id: string;
+  journalId: string;
+  lensId: string;
+  observation: string;
+  /** Phrases from the entry itself, already verified server-side. */
+  supportingQuotes: string[];
+  certainty: 'high' | 'medium' | 'low';
+  reasoning: string;
+  createdAt: string;
+}
+
+/** An affirmation proposed off an analysis. Never applied silently — it stays
+ * 'proposed' until the user explicitly acts on it. */
+export interface LensAffirmation {
+  id: string;
+  analysisId: string;
+  /** As generated. Preserved even after an edit, so the two can be compared. */
+  text: string;
+  status: 'proposed' | 'confirmed' | 'edited' | 'rejected';
+  /** Present when status is 'edited' — what the user rewrote it to. */
+  editedText?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  /** The library entry created on confirm/edit, if any. */
+  entryId?: string;
+}
+
+/** The low-certainty branch: a question waiting for the user, whenever they
+ * feel like answering. Deliberately not blocking anything. */
+export interface PendingReflection {
+  id: string;
+  journalId: string;
+  lensId: string;
+  reflection: string;
+  question: string;
+  resolved: boolean;
+  createdAt: string;
+  resolvedAt?: string;
 }
 
 export interface AppState {
@@ -66,6 +110,9 @@ export interface AppState {
   journal: JournalEntry[];
   /** Oldest first; the last entry is the current portrait. */
   portraitHistory: PortraitVersion[];
+  analyses: Analysis[];
+  lensAffirmations: LensAffirmation[];
+  pendingReflections: PendingReflection[];
   /** Stable per-install value so the daily draw differs between people. */
   seed: number;
 }
@@ -93,6 +140,9 @@ function initialState(): AppState {
     sets: [],
     journal: [],
     portraitHistory: [],
+    analyses: [],
+    lensAffirmations: [],
+    pendingReflections: [],
     seed: Math.floor(Math.random() * 2 ** 31),
   };
 }
@@ -136,6 +186,9 @@ function load(): AppState {
       sets: parsed.sets ?? [],
       journal: parsed.journal ?? [],
       portraitHistory: parsed.portraitHistory ?? [],
+      analyses: parsed.analyses ?? [],
+      lensAffirmations: parsed.lensAffirmations ?? [],
+      pendingReflections: parsed.pendingReflections ?? [],
       seed: parsed.seed ?? base.seed,
     };
   } catch {
@@ -249,22 +302,108 @@ export function addJournalEntry(text: string): string {
 }
 
 export function deleteJournalEntry(id: string) {
-  setState((s) => ({ ...s, journal: s.journal.filter((e) => e.id !== id) }));
+  // Cascade: an analysis, its proposed affirmation, or a question hanging off
+  // a deleted entry has nothing left to refer back to.
+  setState((s) => {
+    const goneAnalyses = s.analyses.filter((a) => a.journalId === id).map((a) => a.id);
+    return {
+      ...s,
+      journal: s.journal.filter((e) => e.id !== id),
+      analyses: s.analyses.filter((a) => a.journalId !== id),
+      lensAffirmations: s.lensAffirmations.filter((a) => !goneAnalyses.includes(a.analysisId)),
+      pendingReflections: s.pendingReflections.filter((r) => r.journalId !== id),
+    };
+  });
 }
 
-/** Records that a reflection ran on this entry, appending any kept entries
- * (an entry can be reflected on more than once). */
-export function recordReflection(journalId: string, newEntryIds: string[]) {
+// ── Lens pipeline ─────────────────────────────────────────────────────────
+
+function newId(prefix: string): string {
+  return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Stores what a lens noticed, and stamps the source entry as analysed. */
+export function addAnalysis(input: Omit<Analysis, 'id' | 'createdAt'>): string {
+  const id = newId('an');
   setState((s) => ({
     ...s,
+    analyses: [...s.analyses, { ...input, id, createdAt: new Date().toISOString() }],
     journal: s.journal.map((e) =>
-      e.id === journalId
+      e.id === input.journalId ? { ...e, analyzedAt: new Date().toISOString() } : e,
+    ),
+  }));
+  return id;
+}
+
+/** Records a proposed affirmation. Always lands as 'proposed' — nothing is
+ * treated as true about the user until they say so. */
+export function addProposedAffirmation(analysisId: string, text: string): string {
+  const id = newId('af');
+  setState((s) => ({
+    ...s,
+    lensAffirmations: [
+      ...s.lensAffirmations,
+      { id, analysisId, text, status: 'proposed', createdAt: new Date().toISOString() },
+    ],
+  }));
+  return id;
+}
+
+/** Resolves a proposed affirmation. `entryId` is set when the user kept it and
+ * a library entry was created; `editedText` when they rewrote it first. */
+export function resolveAffirmation(
+  id: string,
+  status: 'confirmed' | 'edited' | 'rejected',
+  opts: { editedText?: string; entryId?: string } = {},
+) {
+  setState((s) => ({
+    ...s,
+    lensAffirmations: s.lensAffirmations.map((a) =>
+      a.id === id
         ? {
-            ...e,
-            reflectedAt: new Date().toISOString(),
-            generatedEntryIds: [...(e.generatedEntryIds ?? []), ...newEntryIds],
+            ...a,
+            status,
+            resolvedAt: new Date().toISOString(),
+            ...(opts.editedText ? { editedText: opts.editedText } : {}),
+            ...(opts.entryId ? { entryId: opts.entryId } : {}),
           }
-        : e,
+        : a,
+    ),
+    journal: opts.entryId
+      ? s.journal.map((e) => {
+          const analysis = s.analyses.find(
+            (an) => an.id === s.lensAffirmations.find((a) => a.id === id)?.analysisId,
+          );
+          return analysis && e.id === analysis.journalId
+            ? { ...e, generatedEntryIds: [...(e.generatedEntryIds ?? []), opts.entryId!] }
+            : e;
+        })
+      : s.journal,
+  }));
+}
+
+export function addPendingReflection(
+  input: Omit<PendingReflection, 'id' | 'createdAt' | 'resolved'>,
+): string {
+  const id = newId('pr');
+  setState((s) => ({
+    ...s,
+    pendingReflections: [
+      ...s.pendingReflections,
+      { ...input, id, resolved: false, createdAt: new Date().toISOString() },
+    ],
+    journal: s.journal.map((e) =>
+      e.id === input.journalId ? { ...e, analyzedAt: new Date().toISOString() } : e,
+    ),
+  }));
+  return id;
+}
+
+export function resolvePendingReflection(id: string) {
+  setState((s) => ({
+    ...s,
+    pendingReflections: s.pendingReflections.map((r) =>
+      r.id === id ? { ...r, resolved: true, resolvedAt: new Date().toISOString() } : r,
     ),
   }));
 }
